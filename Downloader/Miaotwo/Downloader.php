@@ -45,6 +45,12 @@ class Downloader
     {
         $this->movieParser = $movieParser;
         $this->exportToLocal = trim($exportToLocal);
+
+        $mkdir = !is_dir($this->exportToLocal) && mkdir($this->exportToLocal, 0755, true);
+        if ($mkdir === false) {
+            Logger::create()->error("创建本地视频目录失败：{$exportToLocal}", '[ Error ] ');
+            exit(255);
+        }
         echo Utils::baseInfo();
     }
 
