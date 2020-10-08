@@ -1,0 +1,26 @@
+{
+  "name": "m3u8/downloader",
+  "type": "package",
+  "description": "通过Swoole协程实现并发，专用于下载M3U8视频",
+  "license": "MIT",
+  "keywords": [
+    "m3u8",
+    "swoole",
+    "php",
+    "download"
+  ],
+  "authors": [
+    {
+      "name": "twomiao",
+      "email": "995200452@qq.com"
+    }
+  ],
+  "require": {},
+  "autoload": {
+    "psr-4": {
+      "Downloader\\": "Downloader/"
+    },
+    "files": [
+    ]
+  }
+}
