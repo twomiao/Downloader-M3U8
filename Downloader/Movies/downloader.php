@@ -8,11 +8,10 @@ use Downloader\Miaotwo\Utils;
 use Downloader\Parsers\BaoYun29;
 
 $urls = [
-    // more .... 
+    
 ];
 
-//$local = '/mnt/c/Users/twomiao/desktop/download/1/';
-$local = '/home/download/videos/';
+$local = '/mnt/c/Users/twomiao/desktop/download';
 
 // 开始时间
 $run_at = time();
