@@ -89,7 +89,7 @@ class Downloader
     {
         $this->movieParser->parsed();
         $this->downloadedTotalCount = $this->movieParser->getDownloads();
-        Logger::create()->info("分析M3U8地址获取到：{$this->downloadedTotalCount}个文件", '[ Found ] ');
+        Logger::create()->info("分析M3U8地址获取到：{$this->downloadedTotalCount}个文件\n", '[ Found ] ');
 
         \Swoole\Runtime::enableCoroutine(SWOOLE_HOOK_ALL | SWOOLE_HOOK_CURL);
 
@@ -102,7 +102,7 @@ class Downloader
                 if (is_file($localTsPath)) {
                     $this->tsQueue[$number] = $localTsPath;
                     $this->downloadeCount = ++$this->downloadeCount;
-                    Logger::create()->warn("文件序号#{$number}：{$localTsPath}", '[ Pass ] ');
+//                    Logger::create()->warn("文件序号#{$number}：{$localTsPath}\n", '[ Skip ] ');
                     continue;
                 }
 
@@ -123,9 +123,9 @@ class Downloader
                         $downloadedSize = strlen($content);
 
                         ++$reries;
-                        if ($downloadedSize < 1024) {
+                       /* if ($downloadedSize < 1024) {
                             Logger::create()->warn("重试({$reries})次数, 网络地址：{$tsUrl}", "[ Retry ] ");
-                        }
+                        }*/
                     } while ($reries < 3 || $downloadedSize < 1024); // 重试3次
 
                     if ($downloadedSize > 1024) {
@@ -164,7 +164,7 @@ class Downloader
         $downloads = $this->movieParser->getDownloads();
 
         if (($this->downloadeCount - $downloads) < 0) {
-            Logger::create()->error("任务生成失败, 文件成功数量统计: {$downloads}/{$this->downloadeCount}", "[ Error ] ");
+            Logger::create()->error("任务生成失败, 文件成功数量统计: {$downloads}/{$this->downloadeCount}\n", "[ Error ] ");
             exit(255);
         }
     }

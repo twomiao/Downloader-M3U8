@@ -45,13 +45,13 @@ class ProgressBar
         $fileSize = Utils::fileSize(
             $this->downloader->getDownoadedSize()
         );
-        echo "\n [ Done ] 下载数据完成: {$totalNum}/{$downloaded}个, 文件大小: {$fileSize}.\n";
-        echo " [ Done ] 视频下载成功,已保存到本地: {$this->exportMp4}.\n";
+        echo "\n\n [ Done ] 下载数据完成: {$totalNum}/{$downloaded}个, 文件大小: {$fileSize}.\n";
+        echo "\n [ Done ] 视频下载成功,已保存到本地: {$this->exportMp4}.\n\n\n";
     }
 
     private function tsQueueToMp4Video($tasks, $downloadedCount): int
     {
-        echo "\n";
+        echo "\n\n";
         ksort($tasks);
         foreach ($tasks as $rate => $task) {
             clearstatcache();
@@ -69,11 +69,12 @@ class ProgressBar
 
     public static function darw($percent, $totalCount, $downloadSpeed)
     {
-        printf(" [ Downloading ] \e[0;35m正在下载数据: [%-50s] %d%%, %s, %s个 \r\e[0m",
-            str_repeat('=', $percent / $totalCount * 50),
+        printf(" \e[0;36m[ Downloading ] 正在下载数据: [ %-50s ] %d%%, %s, %s %s\r\e[0m",
+            str_repeat('=', $percent / $totalCount * 50) . ">", //  str_repeat("=", $i) . ">", ($i / $count) * 100
             $percent / $totalCount * 100,
             "网速: {$downloadSpeed}",
-            "文件数量: {$totalCount}/{$percent}"
+            "已下载: {$totalCount}/{$percent}",
+            str_repeat(' ', 5)
         );
     }
 }

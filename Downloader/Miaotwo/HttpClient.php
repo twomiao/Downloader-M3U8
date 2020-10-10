@@ -20,7 +20,7 @@ class HttpClient
         $output = curl_exec($ch);
         if ($output === false) {
             $curlError = curl_error($ch);
-            Logger::create()->error("{$curlError}, resp code:{$respCode} url addr：{$url}", "[ Error ] ");
+//            Logger::create()->error("{$curlError}, resp code:{$respCode} url addr：{$url}", "[ Error ] ");
         }
         curl_close($ch);
         return $output;

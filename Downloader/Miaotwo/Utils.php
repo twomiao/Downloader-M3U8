@@ -17,7 +17,7 @@ class Utils
             ", Os: " . PHP_OS .
             ", Downloader: v" . Downloader::VERSION;
 
-        return "\e[1;32m {$logo}\n\r\e[0m \e[1;30m{$intro} {$boot} {$info}.\e[0m" . PHP_EOL;
+        return "\e[0;36m {$logo}\n\r\e[0m \e[1;30m{$intro} {$boot} {$info}.\n\e[0m" . PHP_EOL;
     }
 
     public static function fileSize($bytes)
