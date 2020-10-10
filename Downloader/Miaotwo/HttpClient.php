@@ -1,6 +1,9 @@
 <?php
 namespace Downloader\Miaotwo;
 
+/************************************
+ * 有时间在替换这破CURL吧
+ ************************************/
 class HttpClient
 {
     public static function get($url)
@@ -16,7 +19,6 @@ class HttpClient
         $respCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $output = curl_exec($ch);
         if ($output === false) {
-            sleep(1);
             $curlError = curl_error($ch);
             Logger::create()->error("{$curlError}, resp code:{$respCode} url addr：{$url}", "[ Error ] ");
         }

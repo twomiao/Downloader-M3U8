@@ -7,7 +7,9 @@ use Downloader\Miaotwo\Downloader;
 use Downloader\Miaotwo\Utils;
 use Downloader\Parsers\BaoYun29;
 
-$urls = [];
+$urls = [
+    ""
+];
 
 $local = '/mnt/c/Users/twomiao/desktop/download';
 

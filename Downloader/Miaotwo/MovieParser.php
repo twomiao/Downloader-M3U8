@@ -1,4 +1,5 @@
 <?php
+
 namespace Downloader\Miaotwo;
 
 class MovieParser
@@ -36,12 +37,13 @@ class MovieParser
     /**
      * MovieParser constructor.
      * @param string $m3u8Url M3U8目标地址
-     * @param MovieParserInterface $movieParser  用于自定义解析器
+     * @param MovieParserInterface $movieParser 用于自定义解析器
      */
     public function __construct(string $m3u8Url, MovieParserInterface $movieParser)
     {
         if (!preg_match('/http[s]*:\/\/([\w.]+\/?)\S*/Uis', $m3u8Url)) {
-            Logger::create()->error("{$m3u8Url} 不是一个有效地地址", "[ Error ] ");
+            Logger::create()->error("{$m3u8Url} 不是一个有效地地址.", "[ Error ]");
+            exit(20);
         }
         $this->m3u8Url = $m3u8Url;
         $this->movieParser = $movieParser;
@@ -50,7 +52,7 @@ class MovieParser
         while ($retries <= 3) {
             $this->m3u8Content = HttpClient::get($m3u8Url);
             if ($this->m3u8Content === false) {
-                Logger::create()->error("{$m3u8Url} 解析地址失败", '[ Error ] ');
+                Logger::create()->error("{$m3u8Url} 解析地址失败.", '[ Error ] ');
             }
 
             if (strlen($this->m3u8Content) > 0) {

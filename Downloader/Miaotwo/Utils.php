@@ -15,14 +15,13 @@ class Utils
         $info = "环境：Swoole:" . SWOOLE_VERSION .
             ", PHP: v" . phpversion() .
             ", Os: " . PHP_OS .
-            ", Downloader: v" . Downloader::VERSION . PHP_EOL;
+            ", Downloader: v" . Downloader::VERSION;
 
-        return "\e[1;32m {$logo}\n\r {$intro} {$boot} {$info}\e[0m" . PHP_EOL;
+        return "\e[1;32m {$logo}\n\r\e[0m \e[1;30m{$intro} {$boot} {$info}.\e[0m" . PHP_EOL;
     }
 
-    public static function fileSize(string $filname)
+    public static function fileSize($bytes)
     {
-        $bytes = filesize($filname);
         if ($bytes > 1024 * 1024 * 1024 * 1024) {
             return round($bytes / (1024 * 1024 * 1024 * 1024), 1) . "TB";
         }
@@ -59,5 +58,11 @@ class Utils
         }
 
         return $remian . ' 秒';
+    }
+
+    public static function downloadSpeed(int $timeNow, int $downloadedSize = 0)
+    {
+        $secondSpeed = $downloadedSize / $timeNow;
+        return self::fileSize(round($secondSpeed, 2)) . '/s';
     }
 }
