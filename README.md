@@ -1,6 +1,6 @@
 
 ### Downloader M3U8：
-   ![image](https://github.com/twomiao/Downloader-M3U8/raw/master/data/start.png")
+   ![m1905.php 启动UI](https://github.com/twomiao/Downloader-M3U8/raw/master/data/start.jpg)
 
 ### M3U8简介：
 > m3u8准确来说是一种索引文件，使用m3u8文件实际上是通过它来解析对应的放在服务器上的视频网络地址，从而实现在线播放。使用m3u8格式文件主要因为可以实现多码率视频的适配，视频网站可以根据用户的网络带宽情况，自动为客户端匹配一个合适的码率文件进行播放，从而保证视频的流畅度。
@@ -31,7 +31,23 @@
   composer install (依赖PSR4)
 ```
 
- 启动Jober：
+Downloader M3U8目录结构：
+```
+|-- Downloader-M3U8
+    |-- Downloader 
+        |-- Miaotwo 
+        |-- Movies  
+            |-- m1905.php -> www.1905.com
+            |-- ..... 更多脚本文件
+            |-- ..... 更多脚本文件
+        |-- Parsers 解析ts规则
+            |-- M1905.php -> www.1905.com
+            |-- ..... 更多脚本文件
+            |-- ..... 更多脚本文件
+    |-- vendor composer autoload 
+```
+
+ 启动 Downloader M3U8：
 
 ```
   $> cd 磁盘目录/Downloader/Movies/
@@ -62,7 +78,7 @@ root@LAPTOP-8LA5CDLH:/mnt/c/Users/twomiao/desktop/Downloader/Downloader/Movies# 
 
 ```
 
-### 提供的m1905脚本文件可直接运行：
+### 可运行案例：
 ```
 <?php
 namespace Downloader\Parsers;
@@ -81,7 +97,7 @@ class M1905 implements MovieParserInterface
     /**
      * 返回一个完整的Ts视频片段地址
      * @param $m3u8Url M3U8地址
-     * @param $movieTs 分片地址自行处理
+     * @param $movieTs M3U8文件中ts地址
      * @return string
      */
     public function parsedTsUrl($m3u8Url, $movieTs): string

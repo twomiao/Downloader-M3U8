@@ -4,7 +4,7 @@ namespace Downloader\Parsers;
 use Downloader\Miaotwo\MovieParserInterface;
 
 /**
- * 网站地址：https://www.1905.com/
+ * 网站地址：https://www.1905.com/vod/?fr=homepc_menu_vod
  * 1905电影网解析规则
  * 特别说明：这是一个完整可运行的案例
  * Class M1905
