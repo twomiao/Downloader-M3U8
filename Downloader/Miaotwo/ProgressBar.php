@@ -23,8 +23,8 @@ class ProgressBar
     public function __construct(Downloader $downloader)
     {
         $this->downloader = $downloader;
-        // 保存视频到本地电脑
-        $this->exportMp4 = $downloader->getExportPath() . "/" . time() . '.mp4';
+        // 保存视频文件到本地电脑
+        $this->exportMp4 = $downloader->getExportPath();
     }
 
     public function paint()
@@ -38,15 +38,14 @@ class ProgressBar
         $downloaded = $this->tsQueueToMp4Video($tasks, $downloadedCount);
 
         if (!is_file($this->exportMp4)) {
-            Logger::create()->error("下载失败: {$this->exportMp4}, 下载文件数量: {$totalNum}/{$downloaded}", '[ Error ] ');
-            exit(244);
+            throw new \Error("下载失败: {$this->exportMp4}, 下载文件数量: {$totalNum}/{$downloaded}", 122);
         }
 
         $fileSize = Utils::fileSize(
             $this->downloader->getDownoadedSize()
         );
         echo "\n\n [ Done ] 下载数据完成: {$totalNum}/{$downloaded}个, 文件大小: {$fileSize}.\n";
-        echo "\n [ Done ] 视频下载成功,已保存到本地: {$this->exportMp4}.\n\n\n";
+        echo "\n [ Done ] 视频下载成功,已保存到本地: {$this->exportMp4}.\n\n";
     }
 
     private function tsQueueToMp4Video($tasks, $downloadedCount): int
@@ -69,12 +68,11 @@ class ProgressBar
 
     public static function darw($percent, $totalCount, $downloadSpeed)
     {
-        printf(" \e[0;36m[ Downloading ] 正在下载数据: [ %-50s ] %d%%, %s, %s %s\r\e[0m",
+        printf(" \e[0;36m[ Downloading ] 正在下载数据: [ %-50s ] %d%%, %s, %s  \r\e[0m",
             str_repeat('=', $percent / $totalCount * 50) . ">", //  str_repeat("=", $i) . ">", ($i / $count) * 100
             $percent / $totalCount * 100,
             "网速: {$downloadSpeed}",
-            "已下载: {$totalCount}/{$percent}",
-            str_repeat(' ', 5)
+            "已下载: {$percent}/{$totalCount}",
         );
     }
 }

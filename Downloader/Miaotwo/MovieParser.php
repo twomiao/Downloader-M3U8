@@ -48,18 +48,17 @@ class MovieParser
         $this->m3u8Url = $m3u8Url;
         $this->movieParser = $movieParser;
 
-        $retries = 0;
-        while ($retries <= 3) {
-            $this->m3u8Content = HttpClient::get($m3u8Url);
-            if ($this->m3u8Content === false) {
-                Logger::create()->error("{$m3u8Url} 解析地址失败.", '[ Error ] ');
-            }
+        $client = new HttpClient();
+        $response = $client
+            ->get()
+            ->request($m3u8Url);
 
-            if (strlen($this->m3u8Content) > 0) {
-                break;
-            }
-            ++$retries;
+        if ($response->isResponseOk() && $response->getBodySize() > 1024) {
+             $this->m3u8Content = $response->getBody();
+        } else {
+            Logger::create()->error("{$m3u8Url} 解析地址失败.", '[ Error ] ');
         }
+
         return $this;
     }
 

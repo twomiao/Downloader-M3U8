@@ -16,7 +16,8 @@
     }
   ],
   "require": {
-    "ext-swoole": ">=4.0.0"
+    "ext-swoole": ">=4.0.0",
+    "ext-curl": "*"
   },
   "autoload": {
     "psr-4": {

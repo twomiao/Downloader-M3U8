@@ -76,12 +76,19 @@ class Downloader
     {
         $this->movieParser = $movieParser;
         $this->exportToLocal = trim($exportToLocal);
-        if (!is_dir($this->exportToLocal) &&
-            !mkdir($this->exportToLocal, 0755, true)
-        ) {
-            Logger::create()->error("创建本地视频目录失败：{$exportToLocal}", '[ Error ] ');
-            exit(255);
+        if (!is_file($this->exportToLocal)) {
+            $exportToLocal = dirname($exportToLocal);
+            if (!is_dir($exportToLocal) &&
+                !mkdir($exportToLocal, 0777, true)
+            ) {
+                throw new \Error("创建本地视频目录失败：{$exportToLocal}", 100);
+            }
+            if (!touch($this->exportToLocal)) {
+                throw new \Error("创建本地视频文件失败：{$this->exportToLocal}", 101);
+            }
+            chmod($this->exportToLocal, 0777);
         }
+
         echo Utils::baseInfo();
     }
 
@@ -89,7 +96,7 @@ class Downloader
     {
         $this->movieParser->parsed();
         $this->downloadedTotalCount = $this->movieParser->getDownloads();
-        Logger::create()->info("分析M3U8地址获取到：{$this->downloadedTotalCount}个文件\n", '[ Found ] ');
+        Logger::create()->info("分析M3U8地址获取到：{$this->downloadedTotalCount}个文件.\n", '[ Found ] ');
 
         \Swoole\Runtime::enableCoroutine(SWOOLE_HOOK_ALL | SWOOLE_HOOK_CURL);
 
@@ -97,11 +104,12 @@ class Downloader
             $channel = new Channel($this->concurrent);
 
             foreach ($this->movieParser->getParserTsQueue() as $number => $tsUrl) {
-                $localTsPath = $this->exportToLocal . '/' . $number . '.ts';
+                $localTsPath = dirname($this->exportToLocal) . '/' . $number . '.ts';
                 clearstatcache();
                 if (is_file($localTsPath)) {
                     $this->tsQueue[$number] = $localTsPath;
                     $this->downloadeCount = ++$this->downloadeCount;
+                    $this->downoadedSize += filesize($localTsPath);
 //                    Logger::create()->warn("文件序号#{$number}：{$localTsPath}\n", '[ Skip ] ');
                     continue;
                 }
@@ -113,37 +121,34 @@ class Downloader
                         $channel->pop();
                     });
 
-                    // speed/s
                     $this->downloadTimeTemp = time();
-                    $reries = 0;
-                    $this->downloadeCount = ++$this->downloadeCount;
-                    do {
-//                        Logger::create()->debug("发现视频文件序号#{$number}：{$tsUrl}", '[ Found ] ');
-                        $content = HttpClient::get($tsUrl);
-                        $downloadedSize = strlen($content);
 
-                        ++$reries;
-                       /* if ($downloadedSize < 1024) {
-                            Logger::create()->warn("重试({$reries})次数, 网络地址：{$tsUrl}", "[ Retry ] ");
-                        }*/
-                    } while ($reries < 3 || $downloadedSize < 1024); // 重试3次
+                    $client = new HttpClient();
+                    $response = $client
+                        ->get()
+                        ->request($tsUrl);
 
-                    if ($downloadedSize > 1024) {
-                        $fileSize = file_put_contents($localTsPath, $content, FILE_APPEND);
+                    file_put_contents("out.log", $this->downloadeCount . PHP_EOL, FILE_APPEND);
+                    if ($response->isResponseOk() && $response->getBodySize() > 1024) {
+                        $this->downloadeCount = ++$this->downloadeCount;
+                        $fileSize = file_put_contents($localTsPath, $response->getBody(), FILE_APPEND);
                         $this->tsQueue[$number] = $localTsPath;
                         $this->downoadedSize += $fileSize;
                         // 每秒下载速度
                         $this->downloadSecondSizeTemp += $fileSize;
                         if (($timeNow = (time() - $this->downloadTimeTemp)) >= 1) {
                             $downloadSpeed = Utils::downloadSpeed($timeNow, $this->downloadSecondSizeTemp);
-                            if ($downloadSpeed > 0) {
-                                ProgressBar::darw($this->downloadeCount, $this->downloadedTotalCount, $downloadSpeed);
-                            }
+//                            if ($downloadSpeed > 0) {
+                            ProgressBar::darw($this->downloadeCount, $this->downloadedTotalCount, $downloadSpeed);
+//                            }
 
                             $this->downloadTimeTemp = 0;
                             $this->downloadSecondSizeTemp = 0;
                         }
 //                    Logger::create()->info("保存视频文件序号#{$number}：{$localTsPath}", '[ Saved ] ');
+                    } else {
+                        --$this->downloadeCount;
+                        var_dump($tsUrl . ',filesize=' . $response->getBodySize());
                     }
                 });
             }
@@ -164,7 +169,7 @@ class Downloader
         $downloads = $this->movieParser->getDownloads();
 
         if (($this->downloadeCount - $downloads) < 0) {
-            Logger::create()->error("任务生成失败, 文件成功数量统计: {$downloads}/{$this->downloadeCount}\n", "[ Error ] ");
+            Logger::create()->error("任务生成失败, 文件成功数量统计: {$this->downloadeCount}/{$downloads}\n", "[ Error ] ");
             exit(255);
         }
     }
