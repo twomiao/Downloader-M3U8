@@ -20,8 +20,8 @@ class HttpClient
 
     protected $options = [
         'request_method' => self::GET_METHOD,
-        'timeout' => 10,
-        'connect_timeout' => 30,
+        'timeout' => 30,
+        'connect_timeout' => 60,
         'retries' => 3,
         'headers' => 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
     ];

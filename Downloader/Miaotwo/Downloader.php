@@ -76,17 +76,11 @@ class Downloader
     {
         $this->movieParser = $movieParser;
         $this->exportToLocal = trim($exportToLocal);
-        if (!is_file($this->exportToLocal)) {
-            $exportToLocal = dirname($exportToLocal);
-            if (!is_dir($exportToLocal) &&
-                !mkdir($exportToLocal, 0777, true)
-            ) {
-                throw new \Error("创建本地视频目录失败：{$exportToLocal}", 100);
-            }
-            if (!touch($this->exportToLocal)) {
-                throw new \Error("创建本地视频文件失败：{$this->exportToLocal}", 101);
-            }
-            chmod($this->exportToLocal, 0777);
+        $exportToLocal = dirname($this->exportToLocal);
+        if (!is_dir($exportToLocal) &&
+            !mkdir($exportToLocal, 0777, true)
+        ) {
+            throw new \Error("创建本地视频目录失败：{$exportToLocal}", 100);
         }
 
         echo Utils::baseInfo();
@@ -106,11 +100,11 @@ class Downloader
             foreach ($this->movieParser->getParserTsQueue() as $number => $tsUrl) {
                 $localTsPath = dirname($this->exportToLocal) . '/' . $number . '.ts';
                 clearstatcache();
+                // skip
                 if (is_file($localTsPath)) {
                     $this->tsQueue[$number] = $localTsPath;
                     $this->downloadeCount = ++$this->downloadeCount;
                     $this->downoadedSize += filesize($localTsPath);
-//                    Logger::create()->warn("文件序号#{$number}：{$localTsPath}\n", '[ Skip ] ');
                     continue;
                 }
 
@@ -128,7 +122,7 @@ class Downloader
                         ->get()
                         ->request($tsUrl);
 
-                    file_put_contents("out.log", $this->downloadeCount . PHP_EOL, FILE_APPEND);
+//                    file_put_contents("out.log", $this->downloadeCount . PHP_EOL, FILE_APPEND);
                     if ($response->isResponseOk() && $response->getBodySize() > 1024) {
                         $this->downloadeCount = ++$this->downloadeCount;
                         $fileSize = file_put_contents($localTsPath, $response->getBody(), FILE_APPEND);
@@ -136,7 +130,7 @@ class Downloader
                         $this->downoadedSize += $fileSize;
                         // 每秒下载速度
                         $this->downloadSecondSizeTemp += $fileSize;
-                        if (($timeNow = (time() - $this->downloadTimeTemp)) >= 1) {
+                        if (($timeNow = (time() - $this->downloadTimeTemp)) > 0) {
                             $downloadSpeed = Utils::downloadSpeed($timeNow, $this->downloadSecondSizeTemp);
 //                            if ($downloadSpeed > 0) {
                             ProgressBar::darw($this->downloadeCount, $this->downloadedTotalCount, $downloadSpeed);

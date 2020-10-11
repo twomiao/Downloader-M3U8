@@ -69,7 +69,7 @@ class ProgressBar
     public static function darw($percent, $totalCount, $downloadSpeed)
     {
         printf(" \e[0;36m[ Downloading ] 正在下载数据: [ %-50s ] %d%%, %s, %s  \r\e[0m",
-            str_repeat('=', $percent / $totalCount * 50) . ">", //  str_repeat("=", $i) . ">", ($i / $count) * 100
+            str_repeat('=', $percent / $totalCount * 50) . ">",
             $percent / $totalCount * 100,
             "网速: {$downloadSpeed}",
             "已下载: {$percent}/{$totalCount}",
