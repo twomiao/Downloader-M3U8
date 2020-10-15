@@ -65,16 +65,21 @@ root@LAPTOP-8LA5CDLH:/mnt/c/Users/twomiao/desktop/Downloader/Downloader/Movies# 
 
  特点：运行平台Linux系统 - 协程并发 - 高速下载M3U8视频 - 自定义并发速度 - 自定义下载任务.
 
- 启动：2020-10-10 17:16:48
+ 启动：2020-10-15 21:20:03
 
- 环境：Swoole:4.5.4, PHP: v7.3.20, Os: Linux, Downloader: v1.0
-.
- [ Found ] 分析M3U8地址获取到：1339个文件
- [ Downloading ] 正在下载数据: [==================================================] 100%, 网速: 5.4MB/s, 文件数量: 1339/1339个
+ 环境：Swoole:4.5.4, PHP: v7.3.20, Os: Linux, Downloader: v1.0.
+
+ [ Found ] 分析M3U8地址获取到：1203个文件.
+
+ [ Downloading ] 正在下载数据: [ ==================================================> ] 100%, 网速: 0B/s, 已下载: 1203/1203
+
  [ Saving ] 视频保存进度: 100%
- [ Done ] 下载数据完成: 1339/1339个, 文件大小: 423.8MB.
- [ Done ] 视频下载成功,已保存到本地: /mnt/c/Users/twomiao/desktop/download/1602321536.mp4.
- [ Done ] 下载完成用时：2.28 分钟
+
+ [ Done ] 下载数据完成: 1203/1203个, 文件大小: 468.7MB.
+
+ [ Done ] 视频下载成功,已保存到本地: /mnt/c/Users/twomiao/desktop/download/202010121039/202010121039.mp4.
+
+ [ Done ] 下载完成用时：59 秒
 
 ```
 
