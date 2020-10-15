@@ -150,6 +150,7 @@ class Downloader
             for ($concurrent = $this->concurrent; $concurrent--;) {
                 $channel->push(true);
             }
+            $channel->close();
         });
 
         $this->checkDownloadError();
