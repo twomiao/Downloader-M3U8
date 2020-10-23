@@ -69,7 +69,7 @@ class MovieParser
     public function parsed()
     {
         if (strlen($this->m3u8Content) > 0) {
-            preg_match_all("#,\s(.*?).ts#is", $this->m3u8Content, $matches);
+            preg_match_all("#,\s(.*?)\.ts#is", $this->m3u8Content, $matches);
             foreach ($matches[1] as $id => $ts) {
                 $ts = trim($ts) . '.ts';
                 $this->tsQueue[] = $this->movieParser->parsedTsUrl($this->m3u8Url, $ts);

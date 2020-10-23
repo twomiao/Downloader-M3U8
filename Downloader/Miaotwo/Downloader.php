@@ -164,7 +164,7 @@ class Downloader
         $downloads = $this->movieParser->getDownloads();
 
         if (($this->downloadeCount - $downloads) < 0) {
-            Logger::create()->error("任务生成失败, 文件成功数量统计: {$this->downloadeCount}/{$downloads}\n", "[ Error ] ");
+            Logger::create()->error("可重新尝试下载失败任务, 文件成功数量统计: {$this->downloadeCount}/{$downloads}\n", "[ Error ] ");
             exit(255);
         }
     }
