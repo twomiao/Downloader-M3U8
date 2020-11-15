@@ -109,7 +109,7 @@ class Downloader
         return $this;
     }
 
-    public function getMovieParser(string $movieParser): ?string
+    public function getMovieParser(string $movieParser): ?array
     {
         return $this->movieParsers[$movieParser] ?? null;
     }
@@ -171,6 +171,17 @@ class Downloader
         return !preg_match('/http[s]*:\/\/([\w.]+\/?)\S*/Uis', $m3u8);
     }
 
+    protected function getMkdirDirectory($movieParserClass, $index)
+    {
+        if($this->hasMovieParser($movieParserClass)) {
+           $m3u8s = $this->getMovieParser($movieParserClass);
+           $filename  = basename($m3u8s[$index]);
+           return str_replace(".m3u8", "", $filename);
+        }
+
+        throw new \RuntimeException("Parser {$movieParserClass} is not defined.");
+    }
+
     public function run()
     {
         $this->targetTsQueue();
@@ -186,7 +197,7 @@ class Downloader
                 foreach ($arrayQueue as $index => $splQueue) {
                     $splQueueCount = $splQueue->count();
 
-                    $directory = substr(md5($movieParserClass), 0, 5);
+                    $directory = $this->getMkdirDirectory($movieParserClass,$index);
                     $output = $this->config['output'] . "/{$directory}{$index}";
 
                     $filename = "{$directory}{$index}.mp4";
