@@ -1,6 +1,6 @@
-<?php
+<?php declare(strict_types=1);
 
-namespace Downloader\Miaotwo;
+namespace Downloader\Runner;
 
 class Utils
 {
@@ -17,7 +17,7 @@ class Utils
             ", Os: " . PHP_OS .
             ", Downloader: v" . Downloader::VERSION;
 
-        return "\e[0;36m {$logo}\n\r\e[0m \e[1;30m{$intro} {$boot} {$info}.\n\e[0m" . PHP_EOL;
+        return "\e[0;36m{$logo}\n\r\e[0m \e[1;30m{$intro} {$boot} {$info}.\n\e[0m" . PHP_EOL;
     }
 
     public static function fileSize($bytes)
@@ -60,9 +60,50 @@ class Utils
         return $remian . ' 秒';
     }
 
+    public static function isDir($dir)
+    {
+        clearstatcache();
+        return is_dir($dir);
+    }
+
+    public static function isFile($file)
+    {
+        clearstatcache();
+        return is_file($file);
+    }
+
+    public static function mkdirDiectory($dir, $mode = 0777)
+    {
+        if (!self::isDir($dir)) {
+            return @mkdir($dir, $mode, true);
+        } else {
+            @chmod($dir, $mode);
+        }
+        return true;
+    }
+
+    public static function touchFile($file, $mode = 0777)
+    {
+        if (!self::isFile($file) && $success = @touch($file)) {
+            @chmod($success, $mode);
+            return $success;
+        }
+        return true;
+    }
+
+    public static function writeFile($file, $content, $append = false)
+    {
+        if ($append) {
+            return @file_put_contents($file, $content, FILE_APPEND);
+        }
+        return @file_put_contents($file, $content);
+    }
+
     public static function downloadSpeed(int $timeNow, int $downloadedSize = 0)
     {
         $secondSpeed = $downloadedSize / $timeNow;
-        return self::fileSize(round($secondSpeed, 2)) . '/s';
+        return self::fileSize(
+                round($secondSpeed, 2)
+            ) . '/s';
     }
 }

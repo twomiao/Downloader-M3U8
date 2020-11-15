@@ -1,6 +1,6 @@
 <?php
 
-namespace Downloader\Miaotwo;
+namespace Downloader\Runner;
 
 interface MovieParserInterface
 {

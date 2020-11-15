@@ -1,53 +1,75 @@
 <?php
+declare(strict_types=1);
+namespace Downloader\Runner;
 
-namespace Downloader\Miaotwo;
+use League\Container\Container;
+use Psr\Container\ContainerInterface;
+use Psr\Log\LoggerInterface;
 
 class HttpClient
 {
+    /**
+     * 请求方式可以扩展
+     */
+    const GET_METHOD  = 'get';
+    const POST_METHOD = 'post';
+
     protected $errorMsg;
 
     protected $statusCode;
 
     protected $errorCode = 0;
 
-    const GET_METHOD = 'get';
-
-    const POST_METHOD = 'post';
-
-    private $postData = [];
-
-    private $resp;
-
     protected $options = [
+        'wait'      => 1,
         'request_method' => self::GET_METHOD,
         'timeout' => 30,
         'connect_timeout' => 60,
-        'retries' => 3,
+        'retries' => 6,
         'headers' => 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
     ];
 
+    /**
+     * @var array $postData
+     */
+    protected $postData = [];
+
+    /**
+     * @var $result
+     */
+    protected $result;
+
+    /**
+     * @var ContainerInterface
+     */
+    protected $container;
+
     public function __construct($options = [])
     {
-        $this->options = array_merge($this->options, $options);
+        $this->options   = array_merge($this->options, $options);
     }
 
+    public function setContianer(ContainerInterface $container)
+    {
+        $this->container = $container;
+    }
 
     public function getBodySize()
     {
-        if ($this->isResponseOk()) {
-            return strlen($this->resp);
+        if ($this->isSucceed()) {
+            return strlen($this->result);
         }
         return 0;
     }
 
     public function getBody()
     {
-        return $this->resp;
+        return $this->result;
     }
 
-    public function isResponseOk()
+    public function isSucceed()
     {
-        return $this->statusCode === 200;
+        return $this->result !== false;
     }
 
     public function getStatusCode()
@@ -102,34 +124,29 @@ class HttpClient
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
         $this->curlRequestMethod($curl);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_TIMEOUT, $this->options['timeout']);
         curl_setopt($curl, CURLOPT_HEADER, $this->options['headers']);
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, $this->options['connect_timeout']);
-        $this->resp = curl_exec($curl);
-        $this->statusCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 
         $reties = 0;
-        while (
-            $this->resp === false &&
-            $reties < $this->options['retries'] &&
-            $this->statusCode !== 200
-        ) {
-            $reties++;
-            usleep(500000);
-            $this->resp = curl_exec($curl);
-            var_dump("retry={$reties},statusCode={$this->statusCode}");
-            /* if ($downloadedSize < 1024) {
-                  Logger::create()->warn("重试({$reries})次数, 网络地址：{$tsUrl}", "[ Retry ] ");
-              }*/
-        }
 
-        if (is_bool($this->resp) && $this->resp === false) {
-            $this->errorMsg = curl_error($curl);
-            $this->errorCode = curl_errno($curl);
-            //  Logger::create()->error("{$curlError}, resp code:{$respCode} url addr：{$url}", "[ Error ] ");
+        while($reties < $this->options['retries'] && ! $this->result = curl_exec($curl))
+        {
+            $reties++;
+            $wait = $this->options['wait'] * $reties;
+            sleep($wait);
+            $this->container->get(LoggerInterface::class)->info("Number of retries ($reties) sleep($wait), failed request: {$url}");
         }
+        // statusCode
+        $this->statusCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        // closed curl
         curl_close($curl);
+
+        if($this->result === false)
+        {
+            throw new RetryRequestException("Failed url {$url}, Curl error: " . curl_error($curl), curl_errno($curl));
+        }
         return $this;
     }
 }

@@ -17,7 +17,11 @@
   ],
   "require": {
     "ext-swoole": ">=4.0.0",
-    "ext-curl": "*"
+    "ext-curl": "*",
+    "league/container": "3.3.3",
+    "kevinlebrun/colors.php": "^1.0",
+    "katzgrau/klogger": "^1.2",
+    "guiguiboy/php-cli-progress-bar": "^0.0.4"
   },
   "autoload": {
     "psr-4": {
