@@ -205,15 +205,14 @@ class Downloader
                 }
 
                 try {
-
-                    $progressBar = $this->startDownloadingSingleTask($m3u8File);
-                    $this->startMergeTask(
-                        $m3u8File
-                    ,$progressBar);
+                    $this->startMergeTask
+                    (
+                          $m3u8File
+                        , $progressBar = $this->startDownloadingSingleTask($m3u8File)
+                    );
                 } catch (\Throwable $e) {
                     $this->container->get('log')->record($e);
                 }
-
             }
         }
 

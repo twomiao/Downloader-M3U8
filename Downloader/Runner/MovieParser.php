@@ -110,9 +110,9 @@ abstract class MovieParser
                         $tsUrl = $this->parsedTsUrl($m3u8Url, $fromTsFile);
 
                         $splQueue->add($id, $tsUrl);
-                        $basename = basename($tsUrl);
-                        $splArray[$id] = $basename;
                         $tsBindMap[basename($tsUrl)] = $tsUrl;
+                        $basename                    = basename($tsUrl);
+                        $splArray[$id]               = $basename;
                     }
 
                     if ($keyInfo = $this->getDecryptionParameters($data)) {
