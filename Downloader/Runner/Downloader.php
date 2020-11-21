@@ -259,8 +259,8 @@ class Downloader
                 $wg->pop();
             });
 
-            $targetTs = "{$output}" . basename($remoteTs);
-            $basename = basename($targetTs);
+            $basename = basename($remoteTs);
+            $targetTs = "{$output}{$basename}";
             clearstatcache();
             if (is_file($targetTs)) {
                 $this->successStatistics[$targetTs] = $basename;

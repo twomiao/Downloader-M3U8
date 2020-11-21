@@ -20,7 +20,7 @@ use Downloader\Parsers\Hua;
 
     $downloader
         ->setMovieParser(new YouKu(), [
-            "https://xigua-cdn.haima-zuida.com/20201024/16083_77f06fd4/1000k/hls/index.m3u8",
+            "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
             "https://dalao.wahaha-kuyun.com/20201114/259_7e8e3c78/1000k/hls/index.m3u8"
         ], new Aes128())
         ->setMovieParser(new Hua(), [

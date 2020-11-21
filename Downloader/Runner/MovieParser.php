@@ -88,8 +88,9 @@ abstract class MovieParser
                 try {
                     $client->get()->request(trim($m3u8Url));
                 } catch (RetryRequestException $e) {
-                    $client->closed();
                     throw  $e;
+                } finally {
+                    $client->closed();
                 }
 
 
@@ -107,12 +108,11 @@ abstract class MovieParser
                     foreach ($matches[1] as $id => $ts) {
                         // 完整ts地址
                         $fromTsFile = trim($ts) . '.ts';
-                        $tsUrl = $this->parsedTsUrl($m3u8Url, $fromTsFile);
-
+                        $tsUrl      = $this->parsedTsUrl($m3u8Url, $fromTsFile);
                         $splQueue->add($id, $tsUrl);
-                        $tsBindMap[basename($tsUrl)] = $tsUrl;
-                        $basename                    = basename($tsUrl);
-                        $splArray[$id]               = $basename;
+                        $basename             = basename($tsUrl);
+                        $tsBindMap[$basename] = $tsUrl;
+                        $splArray[$id]        = $basename;
                     }
 
                     if ($keyInfo = $this->getDecryptionParameters($data)) {
