@@ -1,4 +1,6 @@
 <?php
+
+use Downloader\Runner\Log;
 use Psr\Log\LoggerInterface;
 
 $container = new \League\Container\Container();
@@ -17,15 +19,15 @@ $container->add(
     false
 )->addArguments([0,100,100]);
 
+$container->add(
+    'log',
+    Log::class,
+    false
+)->addArgument($container);
+
 $container->add('client',
     \Downloader\Runner\HttpClient::class,
     false
-);
-
-$container->add(\Downloader\Runner\ExceptionHandler::class,
-    \Downloader\Runner\ExceptionHandler::class,
-)->addArgument($container);
-
-$container->get(\Downloader\Runner\ExceptionHandler::class);
+)->addMethodCall('setContianer', [$container]);
 
 return $container;

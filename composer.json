@@ -21,7 +21,8 @@
     "league/container": "3.3.3",
     "kevinlebrun/colors.php": "^1.0",
     "katzgrau/klogger": "^1.2",
-    "guiguiboy/php-cli-progress-bar": "^0.0.4"
+    "guiguiboy/php-cli-progress-bar": "^0.0.4",
+    "php": ">=7.1.0"
   },
   "autoload": {
     "psr-4": {

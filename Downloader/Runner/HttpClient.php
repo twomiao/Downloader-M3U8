@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
+
 namespace Downloader\Runner;
 
-use League\Container\Container;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -11,22 +11,19 @@ class HttpClient
     /**
      * 请求方式可以扩展
      */
-    const GET_METHOD  = 'get';
+    const GET_METHOD = 'get';
     const POST_METHOD = 'post';
 
-    protected $errorMsg;
-
-    protected $statusCode;
-
-    protected $errorCode = 0;
+    protected $responseCode = 0;
 
     protected $options = [
-        'wait'      => 1,
+        'wait' => 1,
         'request_method' => self::GET_METHOD,
         'timeout' => 30,
-        'connect_timeout' => 60,
-        'retries' => 6,
-        'headers' => 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
+        'connect_timeout' => 15,
+        'retries' => 10,
+        'headers' => [],
+        'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'
     ];
 
     /**
@@ -44,9 +41,11 @@ class HttpClient
      */
     protected $container;
 
+    protected $curl;
+
     public function __construct($options = [])
     {
-        $this->options   = array_merge($this->options, $options);
+        $this->options = array_merge($this->options, $options);
     }
 
     public function setContianer(ContainerInterface $container)
@@ -69,12 +68,12 @@ class HttpClient
 
     public function isSucceed()
     {
-        return $this->result !== false;
+        return $this->result !== false && $this->responseCode === 200;
     }
 
-    public function getStatusCode()
+    public function getResponseCode()
     {
-        return $this->statusCode;
+        return $this->responseCode;
     }
 
     public function get()
@@ -119,34 +118,40 @@ class HttpClient
 
     public function request($url)
     {
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-        $this->curlRequestMethod($curl);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_TIMEOUT, $this->options['timeout']);
-        curl_setopt($curl, CURLOPT_HEADER, $this->options['headers']);
-        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, $this->options['connect_timeout']);
-
+        $this->curl = curl_init();
+        curl_setopt($this->curl, CURLOPT_URL, $url);
+        curl_setopt($this->curl, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($this->curl, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($this->curl, CURLOPT_HTTPHEADER, $this->options['headers']);
+        $this->curlRequestMethod($this->curl);
+        curl_setopt($this->curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($this->curl, CURLOPT_TIMEOUT, $this->options['timeout']);
+        curl_setopt($this->curl, CURLOPT_CONNECTTIMEOUT, $this->options['connect_timeout']);
+        curl_setopt($this->curl, CURLOPT_USERAGENT, $this->options['user_agent']);
         $reties = 0;
 
-        while($reties < $this->options['retries'] && ! $this->result = curl_exec($curl))
-        {
+        while ($reties < $this->options['retries'] && !$this->result = curl_exec($this->curl)) {
             $reties++;
-            $wait = $this->options['wait'] * $reties;
-            sleep($wait);
-            $this->container->get(LoggerInterface::class)->info("Number of retries ($reties) sleep($wait), failed request: {$url}");
+            sleep(1);
+            if ($reties > 6) {
+                if ($this->container)
+                {
+                    $this->container->get(LoggerInterface::class)->info("Number of retries ($reties) sleep(1), failed request: {$url}");
+                }
+            }
         }
-        // statusCode
-        $this->statusCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $this->responseCode = curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
         // closed curl
-        curl_close($curl);
-
-        if($this->result === false)
-        {
-            throw new RetryRequestException("Failed url {$url}, Curl error: " . curl_error($curl), curl_errno($curl));
+        $curl_errno = 0;
+        if ($this->result === false || $curl_errno = curl_errno($this->curl) !== 0 ) {
+            $curl_error = curl_error($this->curl);
+            throw new RetryRequestException("Failed url {$url}, Curl error: {$curl_error}, Curl code:{$curl_errno}.");
         }
         return $this;
+    }
+
+    public function closed()
+    {
+        return curl_close($this->curl);
     }
 }

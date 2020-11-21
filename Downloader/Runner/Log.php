@@ -4,7 +4,7 @@ namespace Downloader\Runner;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
-class ExceptionHandler
+class Log
 {
     protected $container;
 
@@ -15,7 +15,6 @@ class ExceptionHandler
 
     public function __construct(ContainerInterface $container)
     {
-        set_exception_handler([$this, 'record']);
         $this->container = $container;
         $this->logger = $this->container->get(LoggerInterface::class);
     }

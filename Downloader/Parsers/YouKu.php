@@ -12,6 +12,28 @@ class YouKu extends MovieParser
      */
     protected function parsedTsUrl(string $m3u8Url, string $movieTs): string
     {
-        return str_replace("index.m3u8", $movieTs, $m3u8Url);
+        $url = str_replace("index.m3u8", "", $m3u8Url);
+
+        return "{$url}{$movieTs}";
     }
+
+    protected function getParsekey($data)
+    {
+        $data = parent::getParsekey($data);
+
+        /**
+         * array(2) {
+         *["method"]=>
+         *string(7) "AES-128"
+         *["keyUri"]=>
+         *string(7) "key.key"
+         *}
+         */
+//        $keyUri = $data['keyUri'];
+//        $data['keyUri'] =  "https://.......com/81820200424/GC0229379/1000kb/hls/{$keyUri}";
+
+        return $data;
+    }
+
+
 }
