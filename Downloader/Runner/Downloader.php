@@ -226,8 +226,8 @@ class Downloader
      */
     protected function startDownloadingSingleTask(M3u8File $m3u8File): Manager
     {
-        $tsCount = $m3u8File->getTsCount();
-        $wg = $m3u8File->getChannel();
+        $tsCount  = $m3u8File->getTsCount();
+        $wg       = $m3u8File->getChannel();
         $splQueue = $m3u8File->getSplQueue();
         /**
          * @var $progressBar Manager
@@ -342,7 +342,7 @@ class Downloader
                     // 失败任务重试
                     $remoteTs = $bindMap[$basename];
                     //
-                    $this->container->get('log')->debug("retry task, remote_ts=" .$remoteTs);
+                    $this->container->get('log')->record("retry task, remote_ts=" .$remoteTs);
                     $this->singleTaskDownload($m3u8File, $progressBar, $wg, $remoteTs);
                 }
             }
