@@ -2,7 +2,6 @@
 namespace Downloader\Command;
 
 use Downloader\Parsers\Hua;
-use Downloader\Parsers\Se980;
 use Downloader\Parsers\YouKu;
 use Downloader\Runner\Decrypt\Aes128;
 use Symfony\Component\Console\Command\Command;
