@@ -1,6 +1,6 @@
 
 ##### Downloader M3U8：
-<img src="https://img-blog.csdnimg.cn/20201204160827601.gif" width="850" height="500" alt="downloading"/>
+<img src="https://img-blog.csdnimg.cn/20201212234708956.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L20wXzM3MDgyOTYy,size_16,color_FFFFFF,t_70" width="750" height="500" alt="downloading"/>
 
 #### M3U8简介：
 > m3u8准确来说是一种索引文件，使用m3u8文件实际上是通过它来解析对应的放在服务器上的视频网络地址，从而实现在线播放。使用m3u8格式文件主要因为可以实现多码率视频的适配，视频网站可以根据用户的网络带宽情况，自动为客户端匹配一个合适的码率文件进行播放，从而保证视频的流畅度。
@@ -45,8 +45,8 @@ Downloader M3U8目录结构：
  启动 Downloader M3U8：
 
 ```
-  $> cd /mnt/c/Users/twomiao/desktop/Downloader-M3U8/Downloader/start.php
-  $> php start.php 启动下载任务
+  $> cd ***/Downloader-M3U8/Downloader
+  $> php Downloader.php start
 ```
 
 #### 自定义规则：
@@ -87,45 +87,85 @@ class YouKu extends MovieParser
 
         return $data;
     }
-
-
 }
 ```
 
-#### 启动代码：
+#### php Downloader.php start：
 ```
 <?php declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use Downloader\Runner\Downloader;
-use Downloader\Runner\Decrypt\Aes128;
-use Downloader\Parsers\YouKu;
-use Downloader\Parsers\Hua;
+use Swoole\Runtime;
+use Downloader\Runner\Downloader as Downloader;
+use Symfony\Component\Console\Application;
+use Downloader\Command\StartCommand;
 
 \Co\run(function () {
+    Runtime::enableCoroutine(true, SWOOLE_HOOK_ALL);
 
-    \Swoole\Runtime::enableCoroutine(true, SWOOLE_HOOK_ALL);
+    $application = new Application('Downloader-M3u8', Downloader::VERSION);
+    $application->setAutoExit(false);
 
-    $downloader = new Downloader(
-        $container = require __DIR__ . '/Runner/Container.php',
-        $config = [
-            'output' => dirname(__DIR__) . '/../output2',
-            'concurrent' => 25,
-        ]
-    );
-
-    $downloader
-        ->setMovieParser(new YouKu(), [
-            "https://xigua-cdn.haima-zuida.com/20201024/16083_77f06fd4/1000k/hls/index.m3u8",
-            "https://dalao.wahaha-kuyun.com/20201114/259_7e8e3c78/1000k/hls/index.m3u8"
-        ], new Aes128())
-        ->setMovieParser(new Hua(), [
-            "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
-        ], new Aes128())
-        ->run();
+    $application->add(new StartCommand());
+    $application->run();
 });
+```
 
+#### StartCommand：
+```
+<?php
+namespace Downloader\Command;
 
+use Downloader\Parsers\Hua;
+use Downloader\Parsers\YouKu;
+use Downloader\Runner\Decrypt\Aes128;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Downloader\Runner\Downloader;
+use Pimple\Container as PimpleContainer;
+use Downloader\Runner\ServiceProvider;
+use Pimple\Psr11\Container as Psr11Container;
+
+class StartCommand extends Command
+{
+    protected function configure()
+    {
+        $this->setName('start')
+            ->setDescription('Download M3U8 network video concurrently.')
+            ->setHelp('php downloader start');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output)
+    {
+        $container = new PimpleContainer();
+        $container->register(new ServiceProvider());
+        $container['config'] = $container->extend('config', function ($config, $c) use ($output, $input) {
+            return [
+                'output' => __DIR__ . '/../../../output/',
+                'concurrent' => 25,
+                'outputConsole' => $output,
+                'inputConsole' => $input
+            ];
+        });
+
+        $c = new Psr11Container($container);
+
+        $downloader = new Downloader($c, $c->get('config'));
+        $downloader
+            ->setMovieParser(new YouKu(), [
+                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
+                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
+                "https://dalao.wahaha-kuyun.com/20201114/259_7e8e3c78/1000k/hls/index.m3u8"
+            ], new Aes128())
+            ->setMovieParser(new Hua(), [
+                "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
+            ], new Aes128())
+            ->start();
+
+        return Command::SUCCESS;
+    }
+}
 ```
 
 ### License

@@ -9,13 +9,12 @@ use ProgressBar\Manager;
 use ProgressBar\Registry;
 use Psr\Container\ContainerInterface;
 use Swoole\Coroutine;
-use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class MovieParser
 {
 
-    protected const DOWNLOAD_FILE_MAX = 2048;
+    protected const DOWNLOAD_FILE_MAX = 1024;
 
     /**
      * 每组M3u8文件
@@ -146,8 +145,12 @@ abstract class MovieParser
                     $m3u8File->setMergedTsArray($splArray);
                     $m3u8File->setConcurrent($this->getConcurrentNumber());
                     $m3u8File->setBindTsMap($tsBindMap);
-                    // 创建进度条
+
                     $progressBar->advance();
+                } else {
+                    // 地址错误走这里
+                    // todo ....
+//                    var_dump($m3u8Url);
                 }
             }, $wg, $m3u8Url, $progressBar, $index);
         }

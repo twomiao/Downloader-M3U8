@@ -8,7 +8,6 @@ use ProgressBar\Manager;
 use ProgressBar\Registry;
 use Psr\Container\ContainerInterface;
 use Swoole\Coroutine;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -57,6 +56,11 @@ class Downloader
      * @var array $success
      */
     protected $success = [];
+
+    /**
+     * @var array $videoUrls
+     */
+    protected $videoUrls = [];
 
     /**
      * 解密接口实例列表
@@ -219,7 +223,10 @@ class Downloader
 
                 clearstatcache();
                 if (is_file($filename)) {
-                    $this->success['success'][] = $basename;
+                    // 成功文件记录
+                    $this->success[]                 = $basename;
+                    // 成功文件完整路径记录
+                    $this->videoUrls[md5($basename)] = realpath($filename);
                     $this->outputConsole->writeln(">> <fg=green>Download file ({$basename}) already exists locally! </>");
                     continue;
                 }
@@ -251,14 +258,14 @@ class Downloader
      */
     protected function startDownloadingSingleTask(M3u8File $m3u8File): Manager
     {
-        $tsCount = $m3u8File->getTsCount();
-        $wg = $m3u8File->getChannel();
+        $tsCount  = $m3u8File->getTsCount();
+        $wg       = $m3u8File->getChannel();
         $splQueue = $m3u8File->getSplQueue();
         /**
          * @var $progressBar Manager
          */
         $progressBar = $this->container->get('bar');
-        $registery = $progressBar->getRegistry();
+        $registery   = $progressBar->getRegistry();
         $registery->setValue('max', $tsCount);
         $progressBar->setRegistry($registery);
 
@@ -331,12 +338,12 @@ class Downloader
      */
     protected function startMergeTask(M3u8File $m3u8File, Manager $progressBar)
     {
-        $output = $m3u8File->getOutput();
-        $tsCount = $m3u8File->getTsCount();
-        $video = $m3u8File->getM3u8Id();
-        $splArray = $m3u8File->getMergedTsArray();
-        $wg = $m3u8File->getChannel();
-        $bindMap = $m3u8File->getBindTsMap();
+        $output       = $m3u8File->getOutput();
+        $tsCount      = $m3u8File->getTsCount();
+        $video        = $m3u8File->getM3u8Id();
+        $splArray     = $m3u8File->getMergedTsArray();
+        $wg           = $m3u8File->getChannel();
+        $bindMap      = $m3u8File->getBindTsMap();
         $tsTotalCount = $splArray->getSize();
 
         $flag = true;
@@ -401,20 +408,33 @@ class Downloader
                 $registery->setValue('max', $tsCount);
                 $progressBar->setRegistry($registery);
 
+                $count = 0;
                 foreach ($splArray as $index => $file) {
-                    $filename = "{$output}/{$file}";
+                    $videoFullPath = "{$output}/{$file}";
                     clearstatcache();
-                    if (is_file($filename)) {
-                        $data = file_get_contents($filename);
+                    if (is_file($videoFullPath)) {
+                        $count++;
+                        $data = file_get_contents($videoFullPath);
                         Utils::writeFile($video, $data, true);
-                        unlink($filename);
+                        unlink($videoFullPath);
                         $progressBar->advance();
                     }
                 }
-                $this->success['success'][] = $basename;
-                $this->successStatistics = [];
-                $this->outputConsole->writeln(">> <fg=black;bg=green>Download [ {$basename} ] file complete!</>");
 
+                if ($splArray->count() === $count)
+                {
+                    // 成功文件记录
+                    $this->success[]                 = $basename;
+                    // 成功文件完整路径记录
+                    $this->videoUrls[md5($basename)] = realpath($video);
+
+                    // 删除成功统计数据
+                    $this->successStatistics = [];
+
+                    $this->outputConsole->writeln(">> <fg=black;bg=green>Download [ {$basename} ] file complete!</>");
+                } else {
+                    // todo : write fail
+                }
                 break;
             } elseif ((time() - $timeout) > static::DOWNLOAD_TIMEOUT) {
                 $this->outputConsole->writeln(PHP_EOL . PHP_EOL);
@@ -438,20 +458,27 @@ class Downloader
         $this->outputConsole->writeln(">> <info>Download statistics:</info>");
 
         $table = new Table($this->outputConsole);
-        $table->setHeaders(array('ID', 'Filename', 'GroupTotal', 'Status', 'Total'));
+        $table->setHeaders(array('ID', 'Filename', 'GroupTotal', 'Status', 'Total', 'Filesize'));
 
         $rows = [];
+        $fileSize = "0B";
         foreach ($successFiles as $id => $m3u8Filename)
         {
-            if (in_array($m3u8Filename, $this->success['success'], true))
+            if (in_array($m3u8Filename, $this->success, true))
             {
+                $md5Value = md5($m3u8Filename);
+                if (isset($this->videoUrls[$md5Value]))
+                {
+                    $fileSize = Utils::fileSize(filesize($this->videoUrls[$md5Value]));
+                }
+
                 $rows[] = array(
-                    $id, $m3u8Filename, $groupCount, '<info>succeed</info>',  $m3u8Count
+                    $id, $m3u8Filename, $groupCount, '<info>succeed</info>',  $m3u8Count, $fileSize
                 );
                 continue;
             }
             $rows[] = array(
-                $id, $m3u8Filename, $groupCount, '<error>fail</error>',  $m3u8Count
+                $id, $m3u8Filename, $groupCount, '<error>fail</error>',  $m3u8Count, $fileSize
             );
         }
         $table->setRows($rows);
