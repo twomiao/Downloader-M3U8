@@ -8,6 +8,10 @@ use ProgressBar\Manager;
 use ProgressBar\Registry;
 use Psr\Container\ContainerInterface;
 use Swoole\Coroutine;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\Table;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class Downloader
 {
@@ -17,19 +21,19 @@ class Downloader
     const VERSION = '1.0.1';
 
     // 下载超时
-    const AUTO_EXIT_DOWNLOAD_TIMEOUT = 900;
+    const DOWNLOAD_TIMEOUT = 600;
 
     /**
      * 解析器
      * @var $movieParsers array
      */
-    protected $movieParsers;
+    protected $movieParsers = [];
 
     /**
      * 解析器对象
      * @var $movieParsers array
      */
-    protected $movieParserInstances;
+    protected $movieParserInstances = [];
 
     /**
      * @var ContainerInterface $container
@@ -41,11 +45,6 @@ class Downloader
      * @var $queue
      */
     protected $groups = [];
-
-    /**
-     * 失败队列
-     */
-    protected $failQueue;
 
     /**
      * 视频文件总数
@@ -66,11 +65,22 @@ class Downloader
     protected $decrptInterface = [];
 
     /**
+     *
+     * @var OutputInterface $outputConsole
+     */
+    protected $outputConsole = null;
+
+    /**
+     * @var InputInterface $inputConsole
+     */
+    protected $inputConsole = null;
+
+    /**
      * @var array $config
      */
     protected $config = [
-        'output'      => '',
-        'concurrent'  => 25,
+        'output' => '',
+        'concurrent' => 25,
     ];
 
     /**
@@ -86,10 +96,28 @@ class Downloader
      */
     public function __construct(ContainerInterface $container, array $config = [])
     {
-        $this->config    = array_merge($this->config, $config);
+        $this->config = array_merge($this->config, $config);
         $this->container = $container;
+        $this->inputConsole = $config['inputConsole'] ?? null;
+        $this->outputConsole = $config['outputConsole'] ?? null;
 
-        echo Utils::baseInfo();
+        if (empty($this->inputConsole) || !$this->inputConsole instanceof InputInterface) {
+            throw new \InvalidArgumentException("InputInterface is not implemented.");
+        }
+
+        if (empty($this->outputConsole) || !$this->outputConsole instanceof OutputInterface) {
+            throw new \InvalidArgumentException("OutputInterface is not implemented.");
+        }
+
+        $this->config['outputConsole'] = $this->outputConsole;
+        $this->config['inputConsole'] = $this->inputConsole;
+
+        $this->outputConsole->write(PHP_EOL);
+        $this->outputConsole->writeln(">> <comment>" . $this->baseInfo() . "</comment>");
+        $this->outputConsole->write(PHP_EOL);
+        $this->outputConsole->writeln(
+            ">> <fg=black;bg=green>Downloader-M3U8 started successfully!</>"
+        );
     }
 
     /**
@@ -124,9 +152,9 @@ class Downloader
 
     protected function startParsingFile(): void
     {
-        $color = $this->container->get('color');
-
-        echo $color("Loading multiple M3U8 files：")->white()->bold()->highlight('yellow') . PHP_EOL . PHP_EOL;
+        $this->outputConsole->write(PHP_EOL);
+        $this->outputConsole->writeln(">> <fg=white>Retrieving remote file information: </>");
+        $this->outputConsole->write(PHP_EOL);
 
         foreach ($this->movieParsers as $movieParserClass => $m3u8List) {
             $movieParserInstance = $this->getMovieParserInstance($movieParserClass);
@@ -141,6 +169,8 @@ class Downloader
                 ->setM3u8s($m3u8List)
                 ->setDecryptionInterface($this->decrptInterface)
                 ->setConfig($this->config)
+                ->setInputConsole($this->inputConsole)
+                ->setOuputConsole($this->outputConsole)
                 ->setMovieParserClass($movieParserClass)
                 ->runParser();
 
@@ -151,17 +181,12 @@ class Downloader
                 if ($m3u8File instanceof M3u8File) {
                     // 请求成功
                     $this->groups[$movieParserClass][] = $m3u8File;
-                    continue;
                 }
-                $this->failQueue[$movieParserClass][] = $m3u8File;
             }
-
         }
-        echo PHP_EOL;
-        echo $color("Successfully analyzed ( {$this->groupM3u8Sum} ) files and started downloading ......")
-                ->white()
-                ->bold()
-                ->highlight('green') . PHP_EOL . PHP_EOL;
+        $this->outputConsole->write(PHP_EOL);
+        $this->outputConsole->writeln(">> <fg=black;bg=green>Get ({$this->groupM3u8Sum}) tasks, start downloading: </>");
+        $this->outputConsole->write(PHP_EOL);
     }
 
     /**
@@ -179,7 +204,7 @@ class Downloader
         return !preg_match('/http[s]*:\/\/([\w.]+\/?)\S*/Uis', $m3u8);
     }
 
-    public function run()
+    public function start()
     {
         $this->startParsingFile();
 
@@ -188,26 +213,26 @@ class Downloader
              * @var $m3u8File M3u8File
              */
             foreach ($m3u8Files as $index => $m3u8File) {
-
                 $filename = $m3u8File->getM3u8Id();
                 $basename = $m3u8File->getBasename();
-                $output = $m3u8File->getOutput();
+                $output   = $m3u8File->getOutput();
 
                 clearstatcache();
                 if (is_file($filename)) {
                     $this->success['success'][] = $basename;
+                    $this->outputConsole->writeln(">> <fg=green>Download file ({$basename}) already exists locally! </>");
                     continue;
                 }
 
-                echo "Downloading file {$basename}: " . PHP_EOL;
                 if (!Utils::mkdirDiectory($output)) {
-                    throw new \RuntimeException("mkdir fail, dir is:{$output}.");
+                    throw new \RuntimeException("Mkdir fail, dir is:{$output}.");
                 }
 
+                $this->outputConsole->writeln(">> <fg=yellow>Downloading (#{$index}) file [ {$basename} ]: </>");
                 try {
                     $this->startMergeTask
                     (
-                          $m3u8File
+                        $m3u8File
                         , $progressBar = $this->startDownloadingSingleTask($m3u8File)
                     );
                 } catch (\Throwable $e) {
@@ -216,7 +241,7 @@ class Downloader
             }
         }
 
-        $this->resultStatistics();
+        $this->statisticsTable();
     }
 
     /**
@@ -226,8 +251,8 @@ class Downloader
      */
     protected function startDownloadingSingleTask(M3u8File $m3u8File): Manager
     {
-        $tsCount  = $m3u8File->getTsCount();
-        $wg       = $m3u8File->getChannel();
+        $tsCount = $m3u8File->getTsCount();
+        $wg = $m3u8File->getChannel();
         $splQueue = $m3u8File->getSplQueue();
         /**
          * @var $progressBar Manager
@@ -246,7 +271,6 @@ class Downloader
 
         return $progressBar;
     }
-
 
     protected function singleTaskDownload(M3u8File $m3u8File, Manager $progressBar, Channel $wg, string $remoteTs)
     {
@@ -307,20 +331,18 @@ class Downloader
      */
     protected function startMergeTask(M3u8File $m3u8File, Manager $progressBar)
     {
-        $color    = $this->container->get('color');
-        $output   = $m3u8File->getOutput();
-        $tsCount  = $m3u8File->getTsCount();
-        $video    = $m3u8File->getM3u8Id();
+        $output = $m3u8File->getOutput();
+        $tsCount = $m3u8File->getTsCount();
+        $video = $m3u8File->getM3u8Id();
         $splArray = $m3u8File->getMergedTsArray();
-        $wg       = $m3u8File->getChannel();
-        $bindMap  = $m3u8File->getBindTsMap();
+        $wg = $m3u8File->getChannel();
+        $bindMap = $m3u8File->getBindTsMap();
         $tsTotalCount = $splArray->getSize();
 
         $flag = true;
 
         // 失败任务重试
-        if ($this->successStatistics)
-        {
+        if ($this->successStatistics) {
             $differentElements = array_diff($splArray->toArray(), $this->successStatistics);
 
             while ($basename = array_pop($differentElements)) {
@@ -336,13 +358,11 @@ class Downloader
                     $flag = false;
                 }
 
-
-                if (isset($bindMap[$basename]))
-                {
+                if (isset($bindMap[$basename])) {
                     // 失败任务重试
                     $remoteTs = $bindMap[$basename];
                     //
-                    $this->container->get('log')->record("retry task, remote_ts=" .$remoteTs);
+                    $this->container->get('log')->record("retry task, remote_ts=" . $remoteTs);
                     $this->singleTaskDownload($m3u8File, $progressBar, $wg, $remoteTs);
                 }
             }
@@ -352,8 +372,7 @@ class Downloader
             }
         }
 
-
-        // 超时处理开关, 30分钟未完成任务下载自动你退出任务。
+        // 下载超时10分钟退出
         $timeout = time();
         $basename = $m3u8File->getBasename();
 
@@ -369,7 +388,7 @@ class Downloader
             if ($successStatistics === $splArray->count()) {
 
                 $relpath = realpath($output);
-                echo "Saving files：{$relpath}.mp4" . PHP_EOL;
+                $this->outputConsole->writeln(">> <info>Saving files：[ {$relpath}.mp4 ]</info>");
 
                 /**
                  * @var $progressBar Manager
@@ -394,14 +413,12 @@ class Downloader
                 }
                 $this->success['success'][] = $basename;
                 $this->successStatistics = [];
-                echo PHP_EOL;
-                echo $color("Download ( {$basename} ) file complete!")->white()->bold()->highlight('green') .
-                    str_repeat(PHP_EOL, 2);
+                $this->outputConsole->writeln(">> <fg=black;bg=green>Download [ {$basename} ] file complete!</>");
+
                 break;
-            } elseif ((time() - $timeout) > static::AUTO_EXIT_DOWNLOAD_TIMEOUT) {
-                echo PHP_EOL;
-                echo $color("File ( {$basename} ) download timed out.")->white()->bold()->highlight('red') .
-                    str_repeat(PHP_EOL, 2);
+            } elseif ((time() - $timeout) > static::DOWNLOAD_TIMEOUT) {
+                $this->outputConsole->writeln(PHP_EOL . PHP_EOL);
+                $this->outputConsole->writeln(">> <error>File < {$basename} > download timed out.</error>\n\n");
                 break;
             } else {
                 // 0.5 秒运行一次上面的代码
@@ -412,52 +429,61 @@ class Downloader
         echo PHP_EOL;
     }
 
-    protected function resultStatistics()
+    protected function statisticsTable()
     {
-        $success = $this->sucessCount();
-        $error = $this->groupM3u8Sum - $success;
-        $color = $this->container->get('color');
         $successFiles = $this->successFiles();
-        $failFiles = $this->failFiles();
+        $m3u8Count    = $this->groupM3u8Sum;
+        $groupCount   = count($this->groups);
 
-        echo $color('完成任务统计: ')->white()->bold() . PHP_EOL . PHP_EOL;
-        $success = $color($success)->white()->bold()->highlight('green');
-        echo $color("成功数量: {$success} 个, 失败数量: ")->white()->bold();
-        $error = $color($error)->white()->bold()->highlight('red');
-        echo $color("{$error} 个.")->white()->bold() . PHP_EOL . PHP_EOL;
+        $this->outputConsole->writeln(">> <info>Download statistics:</info>");
 
-        echo $color('已成功文件记录: ( ')->white()->bold();
-        echo $color("{$successFiles}")->white()->bold()->highlight('green');
-        echo $color(' ), ')->white()->bold();
-        echo $color('失败文件记录: ( ')->white()->bold();
-        echo $color("{$failFiles}")->white()->bold()->highlight('red');
-        echo $color(' ).')->white()->bold() . PHP_EOL . PHP_EOL;
+        $table = new Table($this->outputConsole);
+        $table->setHeaders(array('ID', 'Filename', 'GroupTotal', 'Status', 'Total'));
 
+        $rows = [];
+        foreach ($successFiles as $id => $m3u8Filename)
+        {
+            if (in_array($m3u8Filename, $this->success['success'], true))
+            {
+                $rows[] = array(
+                    $id, $m3u8Filename, $groupCount, '<info>succeed</info>',  $m3u8Count
+                );
+                continue;
+            }
+            $rows[] = array(
+                $id, $m3u8Filename, $groupCount, '<error>fail</error>',  $m3u8Count
+            );
+        }
+        $table->setRows($rows);
+        $table->render();
     }
 
-    protected function successFiles()
-    {
-        if (isset($this->success['success'])) {
-            return implode(', ', array_values($this->success['success']));
-        }
 
-        return 'empty';
+    protected function successFiles() : array
+    {
+        $groups = [];
+        foreach ($this->groups as $group)
+        {
+            /**
+             * @var M3u8File $m3u8
+             */
+          foreach ( $group as $m3u8)
+          {
+              $groups[] = $m3u8->getBasename();
+          }
+        }
+        return $groups;
     }
 
-    protected function failFiles()
+    public function baseInfo(): string
     {
-        if (isset($this->success['fail'])) {
-            return implode(', ', array_values($this->success['fail']));
-        }
+        $information = sprintf("StartTime: %s, Os: %s, Swoole: %s, PHP: %s",
+            date('Y-m-d H:i:s'),
+            PHP_OS,
+            SWOOLE_VERSION,
+            phpversion()
+        );
 
-        return 'empty';
-    }
-
-    protected function sucessCount(): int
-    {
-        if (isset($this->success['success'])) {
-            return count($this->success['success']);
-        }
-        return 0;
+        return $information;
     }
 }

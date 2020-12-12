@@ -187,6 +187,11 @@ class M3u8File
      */
     public function setOutput(string $output): void
     {
+        if (empty($output))
+        {
+            throw new \InvalidArgumentException("Invalid path: {$output}.");
+        }
+
         $this->output = $output;
     }
 

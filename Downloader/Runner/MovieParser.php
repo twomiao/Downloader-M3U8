@@ -9,7 +9,8 @@ use ProgressBar\Manager;
 use ProgressBar\Registry;
 use Psr\Container\ContainerInterface;
 use Swoole\Coroutine;
-use Swoole\Runtime;
+use Symfony\Component\Console\Helper\ProgressBar;
+use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class MovieParser
 {
@@ -51,6 +52,12 @@ abstract class MovieParser
     protected $config = [];
 
     /**
+     * @var OutputInterface $outputConsole
+     */
+    protected $outputConsole;
+    protected $inputConsole;
+
+    /**
      * @param $m3u8Url string 视频文件信息
      * @param $movieTs  string ts文件名称
      * @return string  返回完整ts视频地址
@@ -70,12 +77,8 @@ abstract class MovieParser
         $progressBar->setRegistry($registry);
 
         foreach ($this->m3u8Urls as $index => $m3u8Url) {
-
             $wg->add();
             Coroutine::create(function (WaitGroup $wg, $m3u8Url, Manager $progressBar, $index) {
-                $m3u8File = new M3u8File();
-                $this->m3u8Files[$index] = $m3u8File;
-
                 defer(function () use ($wg, $progressBar) {
                     $wg->done();
                 });
@@ -88,19 +91,19 @@ abstract class MovieParser
                 try {
                     $client->get()->request(trim($m3u8Url));
                 } catch (RetryRequestException $e) {
-                    throw  $e;
+                    $this->container->get('log')->record($e);
                 } finally {
                     $client->closed();
                 }
 
-
                 if ($client->getBodySize() > self::DOWNLOAD_FILE_MAX) {
+                    $m3u8File = new M3u8File();
+                    $this->m3u8Files[$index] = $m3u8File;
+
                     // make queue
-                    list($splQueue,$data,$tsBindMap) = [
-                        new \SplQueue(),
-                        $client->getBody(),
-                        []
-                    ];
+                    [$splQueue, $data, $tsBindMap] = array(
+                        new \SplQueue(), $client->getBody(), []
+                    );
 
                     preg_match_all("#,\s(.*?)\.ts#is", $data, $matches);
                     $splArray = new \SplFixedArray(count($matches[1]));
@@ -108,11 +111,11 @@ abstract class MovieParser
                     foreach ($matches[1] as $id => $ts) {
                         // 完整ts地址
                         $fromTsFile = trim($ts) . '.ts';
-                        $tsUrl      = $this->parsedTsUrl($m3u8Url, $fromTsFile);
+                        $tsUrl = $this->parsedTsUrl($m3u8Url, $fromTsFile);
                         $splQueue->add($id, $tsUrl);
-                        $basename             = basename($tsUrl);
+                        $basename = basename($tsUrl);
                         $tsBindMap[$basename] = $tsUrl;
-                        $splArray[$id]        = $basename;
+                        $splArray[$id] = $basename;
                     }
 
                     if ($keyInfo = $this->getDecryptionParameters($data)) {
@@ -133,29 +136,48 @@ abstract class MovieParser
                         $m3u8File->setDecryptInstance($decryptInstance);
                     }
 
-                    $output = "{$this->config['output']}/" . $this->getGroupName() . '/';
-                    $concurrent = intval($this->config['concurrent']);
                     // 队列
                     $m3u8File->setSplQueue($splQueue);
                     $m3u8File->setGroupId($this->movieParserClass);
-                    $m3u8File->setOutput($output);
+                    $m3u8File->setOutput($this->getOutputDir());
                     $m3u8File->setM3u8Id($index);
                     $m3u8File->setTsCount($splQueue->count());
-                    $m3u8File->setChannel(new Channel($concurrent));
+                    $m3u8File->setChannel(new Channel($this->getConcurrentNumber()));
                     $m3u8File->setMergedTsArray($splArray);
-                    $m3u8File->setConcurrent($concurrent);
+                    $m3u8File->setConcurrent($this->getConcurrentNumber());
                     $m3u8File->setBindTsMap($tsBindMap);
                     // 创建进度条
                     $progressBar->advance();
                 }
             }, $wg, $m3u8Url, $progressBar, $index);
         }
-        if ($wg->wait(60) === false) {
-            throw new \RuntimeException(
-                'Channel timeout, failed file information::' . var_export($this->m3u8Urls, true)
-            );
+        try {
+            if ($wg->wait(60) === false) {
+                throw new \RuntimeException(
+                    'Channel timeout, failed file information::' . var_export($this->m3u8Urls, true)
+                );
+            }
+        } catch (\RuntimeException $e) {
+            $this->container->get('log')->record($e);
         }
         return $this->m3u8Files;
+    }
+
+    private function getConcurrentNumber()
+    {
+        $concurrent = intval($this->config['concurrent'] ?? '15');
+
+        return $concurrent < 1 ? 15 : $concurrent;
+    }
+
+    protected function getOutputDir()
+    {
+        $outputDir = $this->config['output'];
+        if (substr($outputDir, -1) === DIRECTORY_SEPARATOR) {
+            return $outputDir . $this->getGroupName() . DIRECTORY_SEPARATOR;
+        }
+
+        return $outputDir . DIRECTORY_SEPARATOR . $this->getGroupName() . DIRECTORY_SEPARATOR;
     }
 
     protected function getGroupName()
@@ -182,6 +204,8 @@ abstract class MovieParser
                 $client->get()->request($keyInfo['keyUri']);
             } catch (RetryRequestException $e) {
                 throw $e;
+            } finally {
+                $client->closed();
             }
 
             if ($client->isSucceed()) {
@@ -236,6 +260,22 @@ abstract class MovieParser
     public function setDecryptionInterface($decryptInterface)
     {
         $this->decryptInterface = $decryptInterface;
+        return $this;
+    }
+
+    /**
+     * @param $outputConsole
+     * @return $this
+     */
+    public function setOuputConsole($outputConsole)
+    {
+        $this->outputConsole = $outputConsole;
+        return $this;
+    }
+
+    public function setInputConsole($inputConsole)
+    {
+        $this->inputConsole = $inputConsole;
         return $this;
     }
 

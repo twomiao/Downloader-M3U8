@@ -4,22 +4,6 @@ namespace Downloader\Runner;
 
 class Utils
 {
-    public static function baseInfo()
-    {
-        $logo = " ___                          _                   _                 __  __   ____         ___
- |   \   ___  __ __ __  _ _   | |  ___   __ _   __| |  ___   _ _    |  \/  | |__ /  _  _  ( _ )
- | |) | / _ \ \ V  V / | ' \  | | / _ \ / _` | / _` | / -_) | '_|   | |\/| |  |_ \ | || | / _ \
- |___/  \___/  \_/\_/  |_||_| |_| \___/ \__,_| \__,_| \___| |_|     |_|  |_| |___/  \_,_| \___/\n";
-        $intro = "特点：运行平台Linux系统 - 协程并发 - 高速下载M3U8视频 - 自定义并发速度 - 自定义下载任务.\n\n";
-        $boot = "启动：" . date('Y-m-d H:i:s', time()) . "\n\n";
-        $info = "环境：Swoole:" . SWOOLE_VERSION .
-            ", PHP: v" . phpversion() .
-            ", Os: " . PHP_OS .
-            ", Downloader: v" . Downloader::VERSION;
-
-        return "\e[0;36m{$logo}\n\r\e[0m \e[1;30m{$intro} {$boot} {$info}.\n\e[0m" . PHP_EOL;
-    }
-
     public static function fileSize($bytes)
     {
         if ($bytes > 1024 * 1024 * 1024 * 1024) {
@@ -74,6 +58,8 @@ class Utils
 
     public static function mkdirDiectory($dir, $mode = 0777)
     {
+        if (empty($dir)) return false;
+
         if (!self::isDir($dir)) {
             return @mkdir($dir, $mode, true);
         } else {
