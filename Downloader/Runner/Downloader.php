@@ -100,9 +100,9 @@ class Downloader
      */
     public function __construct(ContainerInterface $container, array $config = [])
     {
-        $this->config = array_merge($this->config, $config);
-        $this->container = $container;
-        $this->inputConsole = $config['inputConsole'] ?? null;
+        $this->config        = array_merge($this->config, $config);
+        $this->container     = $container;
+        $this->inputConsole  = $config['inputConsole'] ?? null;
         $this->outputConsole = $config['outputConsole'] ?? null;
 
         if (empty($this->inputConsole) || !$this->inputConsole instanceof InputInterface) {
@@ -114,7 +114,7 @@ class Downloader
         }
 
         $this->config['outputConsole'] = $this->outputConsole;
-        $this->config['inputConsole'] = $this->inputConsole;
+        $this->config['inputConsole']  = $this->inputConsole;
 
         $this->outputConsole->write(PHP_EOL);
         $this->outputConsole->writeln(">> <comment>" . $this->baseInfo() . "</comment>");
@@ -437,8 +437,8 @@ class Downloader
                 }
                 break;
             } elseif ((time() - $timeout) > static::DOWNLOAD_TIMEOUT) {
-                $this->outputConsole->writeln(PHP_EOL . PHP_EOL);
-                $this->outputConsole->writeln(">> <error>File < {$basename} > download timed out.</error>\n\n");
+                $this->outputConsole->write(PHP_EOL.PHP_EOL);
+                $this->outputConsole->writeln(">> <error>File < {$basename} > download timed out.</error>");
                 break;
             } else {
                 // 0.5 秒运行一次上面的代码
@@ -446,7 +446,7 @@ class Downloader
             }
         }
 
-        echo PHP_EOL;
+        $this->outputConsole->write(PHP_EOL.PHP_EOL);
     }
 
     protected function statisticsTable()
@@ -458,7 +458,7 @@ class Downloader
         $this->outputConsole->writeln(">> <info>Download statistics:</info>");
 
         $table = new Table($this->outputConsole);
-        $table->setHeaders(array('ID', 'Filename', 'GroupTotal', 'Status', 'Total', 'Filesize'));
+        $table->setHeaders(array('no', 'filename',  'file_size', 'status', 'group_count', 'file_count'));
 
         $rows = [];
         $fileSize = "0B";
@@ -473,12 +473,12 @@ class Downloader
                 }
 
                 $rows[] = array(
-                    $id, $m3u8Filename, $groupCount, '<info>succeed</info>',  $m3u8Count, $fileSize
+                    $id, $m3u8Filename, $fileSize, '<info>succeed</info>', $groupCount, $m3u8Count,
                 );
                 continue;
             }
             $rows[] = array(
-                $id, $m3u8Filename, $groupCount, '<error>fail</error>',  $m3u8Count, $fileSize
+                $id, $m3u8Filename, $fileSize, '<error>fail</error>', $groupCount, $m3u8Count,
             );
         }
         $table->setRows($rows);
