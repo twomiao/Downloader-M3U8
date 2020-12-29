@@ -270,7 +270,7 @@ abstract class MovieParser
      * @param $outputConsole
      * @return $this
      */
-    public function setOuputConsole($outputConsole)
+    public function setOutputConsole($outputConsole)
     {
         $this->outputConsole = $outputConsole;
         return $this;

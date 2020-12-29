@@ -49,18 +49,18 @@ class Downloader
      * 视频文件总数
      * @var int $groupM3u8Sum
      */
-    protected $groupM3u8Sum = 0;
+    protected $groupM3u8Sum   = 0;
 
     /**
      * 下载成功文件
      * @var array $success
      */
-    protected $success = [];
+    protected $success        = [];
 
     /**
      * @var array $videoUrls
      */
-    protected $videoUrls = [];
+    protected $videoUrls      = [];
 
     /**
      * 解密接口实例列表
@@ -72,19 +72,19 @@ class Downloader
      *
      * @var OutputInterface $outputConsole
      */
-    protected $outputConsole = null;
+    protected $outputConsole  = null;
 
     /**
      * @var InputInterface $inputConsole
      */
-    protected $inputConsole = null;
+    protected $inputConsole   = null;
 
     /**
      * @var array $config
      */
     protected $config = [
-        'output' => '',
-        'concurrent' => 25,
+        'output'      => '',
+        'concurrent'  => 25,
     ];
 
     /**
@@ -174,7 +174,7 @@ class Downloader
                 ->setDecryptionInterface($this->decrptInterface)
                 ->setConfig($this->config)
                 ->setInputConsole($this->inputConsole)
-                ->setOuputConsole($this->outputConsole)
+                ->setOutputConsole($this->outputConsole)
                 ->setMovieParserClass($movieParserClass)
                 ->runParser();
 
@@ -231,7 +231,7 @@ class Downloader
                     continue;
                 }
 
-                if (!Utils::mkdirDiectory($output)) {
+                if (!Utils::mkdirDirectory($output)) {
                     throw new \RuntimeException("Mkdir fail, dir is:{$output}.");
                 }
 

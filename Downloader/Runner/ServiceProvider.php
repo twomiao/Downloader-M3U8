@@ -48,7 +48,7 @@ class ServiceProvider implements ServiceProviderInterface
             $c = new \Pimple\Psr11\Container($container);
 
             $client = new HttpClient();
-            $client->setContianer($c);
+            $client->setContainer($c);
             return $client;
         });
     }

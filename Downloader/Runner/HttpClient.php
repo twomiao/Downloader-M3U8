@@ -48,7 +48,7 @@ class HttpClient
         $this->options = array_merge($this->options, $options);
     }
 
-    public function setContianer(ContainerInterface $container)
+    public function setContainer(ContainerInterface $container)
     {
         $this->container = $container;
     }
@@ -128,16 +128,13 @@ class HttpClient
         curl_setopt($this->curl, CURLOPT_TIMEOUT, $this->options['timeout']);
         curl_setopt($this->curl, CURLOPT_CONNECTTIMEOUT, $this->options['connect_timeout']);
         curl_setopt($this->curl, CURLOPT_USERAGENT, $this->options['user_agent']);
-        $reties = 0;
 
+        $reties = 0;
         while ($reties < $this->options['retries'] && !$this->result = curl_exec($this->curl)) {
             $reties++;
             sleep(1);
             if ($reties > 6) {
-                if ($this->container)
-                {
-                    $this->container->get(LoggerInterface::class)->info("Number of retries ($reties) sleep(1), failed request: {$url}");
-                }
+                $this->container->get(LoggerInterface::class)->info("Retries ($reties) sleep(1), failed request: {$url}");
             }
         }
         $this->responseCode = curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
@@ -152,6 +149,10 @@ class HttpClient
 
     public function closed()
     {
-        return curl_close($this->curl);
+        if ($this->curl)
+        {
+            return curl_close($this->curl);
+        }
+        return false;
     }
 }
