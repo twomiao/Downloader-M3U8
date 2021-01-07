@@ -203,6 +203,13 @@ class M3u8File
         return basename($this->m3u8Id);
     }
 
+    /**
+     * @return string
+     */
+    public function getHashId()
+    {
+        return md5(basename($this->m3u8Id));
+    }
 
     /**
      * @return \SplQueue

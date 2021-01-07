@@ -8,11 +8,11 @@ use Psr\Log\LoggerInterface;
 
 class HttpClient
 {
-    /**
-     * 请求方式可以扩展
-     */
-    const GET_METHOD = 'get';
-    const POST_METHOD = 'post';
+    const GET_METHOD    = 'get';
+
+    const POST_METHOD   = 'post';
+
+    const DELETE_METHOD = 'delete';
 
     protected $responseCode = 0;
 
@@ -131,11 +131,11 @@ class HttpClient
 
         $reties = 0;
         while ($reties < $this->options['retries'] && !$this->result = curl_exec($this->curl)) {
-            $reties++;
             sleep(1);
             if ($reties > 6) {
-                $this->container->get(LoggerInterface::class)->info("Retries ($reties) sleep(1), failed request: {$url}");
+                throw new RetryRequestException("Retries ($reties) sleep(1), failed request: {$url}");
             }
+            $reties++;
         }
         $this->responseCode = curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
         // closed curl
@@ -154,5 +154,10 @@ class HttpClient
             return curl_close($this->curl);
         }
         return false;
+    }
+
+    public function __destruct()
+    {
+        $this->closed();
     }
 }
