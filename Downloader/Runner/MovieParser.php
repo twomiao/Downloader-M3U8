@@ -1,10 +1,8 @@
 <?php declare(strict_types=1);
-
 namespace Downloader\Runner;
 
 use Co\Channel;
 use Co\WaitGroup;
-use Downloader\Runner\Decrypt\DecryptionInterface;
 use ProgressBar\Manager;
 use ProgressBar\Registry;
 use Psr\Container\ContainerInterface;
@@ -34,10 +32,10 @@ abstract class MovieParser
     protected $container;
 
     /**
-     * 解密接口列表
-     * @var DecryptionInterface $decryptInterface
+     * 解密中间件集合
+     * @var array $decryptMiddleware
      */
-    protected $decryptInterface;
+    protected $decryptMiddleware;
 
     /**
      * @var $movieParserClass
@@ -100,53 +98,42 @@ abstract class MovieParser
                         $this->m3u8Files[$index] = $m3u8File;
 
                         // make queue
-                        [$splQueue, $data, $tsBindMap] = array(
-                            new \SplQueue(), $client->getBody(), []
-                        );
+                        [$splQueue, $data, $tsBindMap] =
+                            array(
+                                 new \SplQueue(),
+                                $client->getBody(),
+                                array()
+                             );
 
-                        preg_match_all("#,\s(.*?)\.ts#is", $data, $matches);
-                        $splArray = new \SplFixedArray(count($matches[1]));
-
-                        foreach ($matches[1] as $id => $ts) {
-                            // 完整ts地址
-                            $fromTsFile = trim($ts) . '.ts';
-                            $tsUrl = $this->parsedTsUrl($m3u8Url, $fromTsFile);
-                            $splQueue->add($id, $tsUrl);
-                            $basename = basename($tsUrl);
-                            $tsBindMap[$basename] = $tsUrl;
-                            $splArray[$id] = $basename;
-                        }
-
-                        if ($keyInfo = $this->getDecryptionParameters($data)) {
-                            if (isset($keyInfo['vi'])) {
-                                $m3u8File->setDecryptIV($keyInfo['vi']);
+                        // Get ts list from M3U8 file.
+                        if ($tsUrls = $this->readTSFileUrls($data))
+                        {
+                            $splArray = new \SplFixedArray(count($tsUrls));
+                            foreach ($tsUrls as $id => $ts) {
+                                // 完整ts地址
+                                $fromTsFile = trim($ts) . '.ts';
+                                $tsUrl = $this->parsedTsUrl($m3u8Url, $fromTsFile);
+                                $splQueue->add($id, $tsUrl);
+                                $basename = basename($tsUrl);
+                                $tsBindMap[$basename] = $tsUrl;
+                                $splArray[$id] = $basename;
                             }
 
-                            $m3u8File->setDecryptKey($keyInfo['key']);
-                            $m3u8File->setDecryptMethod($keyInfo['method']);
-
-                            $decryptInstance = $this->decryptInterface[$this->movieParserClass] ?? null;
-
-                            if (!$decryptInstance) {
-                                throw new \RuntimeException(
-                                    "The {$this->movieParserClass} class does not implement the decryptionInterface."
-                                );
-                            }
-                            $m3u8File->setDecryptInstance($decryptInstance);
+                            // M3u8File Object.
+                            $m3u8File->setSplQueue($splQueue);
+                            $m3u8File->setGroupId($this->movieParserClass);
+                            $m3u8File->setOutput($this->getOutputDir());
+                            $m3u8File->setM3u8Id($index);
+                            $m3u8File->setTsCount($splQueue->count());
+                            $m3u8File->setChannel(new Channel($this->getConcurrentNumber()));
+                            $m3u8File->setMergedTsArray($splArray);
+                            $m3u8File->setConcurrent($this->getConcurrentNumber());
+                            $m3u8File->setBindTsMap($tsBindMap);
+                            $m3u8File->setM3u8UrlData($data);
+                            $m3u8File->setDecryptMiddleware($this->decryptMiddleware);
+                            // add progressbar:1
+                            $progressBar->advance();
                         }
-
-                        // M3u8File Object.
-                        $m3u8File->setSplQueue($splQueue);
-                        $m3u8File->setGroupId($this->movieParserClass);
-                        $m3u8File->setOutput($this->getOutputDir());
-                        $m3u8File->setM3u8Id($index);
-                        $m3u8File->setTsCount($splQueue->count());
-                        $m3u8File->setChannel(new Channel($this->getConcurrentNumber()));
-                        $m3u8File->setMergedTsArray($splArray);
-                        $m3u8File->setConcurrent($this->getConcurrentNumber());
-                        $m3u8File->setBindTsMap($tsBindMap);
-
-                        $progressBar->advance();
                     }
                 } catch (RetryRequestException $e) {
                     $this->container->get('log')->record($e);
@@ -159,6 +146,16 @@ abstract class MovieParser
             );
         }
         return $this->m3u8Files;
+    }
+
+    /**
+     * @param $data
+     * @return array
+     */
+    protected function readTSFileUrls($data) : array
+    {
+        preg_match_all("#,\s(.*?)\.ts#is", $data, $matches);
+        return $matches[1]  ?? [];
     }
 
     private function getConcurrentNumber()
@@ -183,58 +180,6 @@ abstract class MovieParser
         return substr(md5($this->movieParserClass), 32 - 9);
     }
 
-    /**
-     * 获取加密KEY
-     * @param string $data
-     * @return array|null
-     */
-    protected function getDecryptionParameters(string $data): ?array
-    {
-        $keyInfo = $this->getParsekey($data);
-        if ($keyInfo) {
-            /**
-             * @var $client HttpClient
-             */
-            $client = $this->container->get('client');
-
-            try {
-                $client->get()->request($keyInfo['keyUri']);
-                if ($client->isSucceed()) {
-                    $keyInfo['key'] = $client->getBody();
-                    return $keyInfo;
-                }
-            } catch (RetryRequestException $e) {
-                throw $e;
-            }
-        }
-
-        return [];
-    }
-
-    protected function getParsekey($data)
-    {
-        $doesIt = preg_match("#\#EXT-X-KEY:METHOD=(.*?)\#EXTINF#is", $data, $matches);
-
-        if ($doesIt) {
-            $line = trim($matches[1]);
-            $result = explode(',', $line);
-            $method = $result[0];
-            preg_match('/URI="(.*?)"/is', $result[1], $keyUri);
-            $keyUri = $keyUri[1];
-
-            switch (count($result)) {
-                case 2:
-                    return compact('method', 'keyUri');
-                case 3:
-                    $vi = $result[2];
-                    return compact('method', 'keyUri', 'vi');
-                default:
-                    break;
-            }
-        }
-        return [];
-    }
-
     public function setMovieParserClass($movieParserClass)
     {
         $this->movieParserClass = $movieParserClass;
@@ -251,9 +196,13 @@ abstract class MovieParser
         return $this;
     }
 
-    public function setDecryptionInterface($decryptInterface)
+    /**
+     * @param array $decryptMiddleware
+     * @return $this
+     */
+    public function setDecryptMiddleware(array $decryptMiddleware)
     {
-        $this->decryptInterface = $decryptInterface;
+        $this->decryptMiddleware = $decryptMiddleware;
         return $this;
     }
 

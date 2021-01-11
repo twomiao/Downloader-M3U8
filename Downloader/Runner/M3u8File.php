@@ -2,7 +2,6 @@
 namespace Downloader\Runner;
 
 use Co\Channel;
-use Downloader\Runner\Decrypt\DecryptionInterface;
 
 class M3u8File
 {
@@ -25,15 +24,16 @@ class M3u8File
     protected $splQueue;
 
     /**
-     * @var $decryptKey string
+     * 解密中间件
+     * @var $decryptMiddleware array
      */
-    protected $decryptKey = '';
+    protected $decryptMiddleware;
 
     /**
-     *
-     * @var $decryptIV string
+     * m3u8url 数据内容
+     * @var $m3u8UrlData string
      */
-    protected $decryptIV = '';
+    protected $m3u8UrlData;
 
     /**
      * 分组ID
@@ -42,19 +42,9 @@ class M3u8File
     protected $groupId = '';
 
     /**
-     * @var string $shuffix
+     * @var string $suffix
      */
-    protected $shuffix = 'mp4';
-
-    /**
-     * @var DecryptionInterface $decryptInstance
-     */
-    protected $decryptInstance = null;
-
-    /**
-     * @var $decrptyMethod
-     */
-    protected $decrptyMethod = '';
+    protected $suffix = 'mp4';
 
     /**
      * @var \SplFixedArray $mergedTs
@@ -77,10 +67,43 @@ class M3u8File
     protected $concurrent = 0;
 
     /**
-     * [basenmae] => [remoteTs]
+     * basename:remote_ts, .....
      * @var array $tsMap
      */
     protected $bindTsMap = [];
+
+    /**
+     * 获取解密中间件集合
+     * @return array
+     */
+    public function getDecryptMiddleware(): array
+    {
+        return $this->decryptMiddleware;
+    }
+
+    /**
+     * @param array $decryptMiddleware
+     */
+    public function setDecryptMiddleware(array $decryptMiddleware): void
+    {
+        $this->decryptMiddleware = $decryptMiddleware;
+    }
+
+    /**
+     * @return string
+     */
+    public function getM3u8UrlData(): string
+    {
+        return $this->m3u8UrlData;
+    }
+
+    /**
+     * @param string $m3u8UrlData
+     */
+    public function setM3u8UrlData(string $m3u8UrlData): void
+    {
+        $this->m3u8UrlData = $m3u8UrlData;
+    }
 
     /**
      * @return array
@@ -122,18 +145,6 @@ class M3u8File
         return $this->m3u8Id;
     }
 
-
-    public function setDecryptMethod($decrptyMethod)
-    {
-        $this->decrptyMethod = $decrptyMethod;
-        return $this;
-    }
-
-    public function getDecryptMethod()
-    {
-        return $this->decrptyMethod;
-    }
-
     /**
      * @param int $index
      */
@@ -141,37 +152,20 @@ class M3u8File
     {
         if ($index >= 0) {
             $basename = basename($this->output);
-            $m3u8Id = $this->output . "{$index}_{$basename}.{$this->shuffix}";
+            $m3u8Id = $this->output . "{$index}_{$basename}.{$this->suffix}";
 
             $this->m3u8Id = $m3u8Id;
             return;
         }
-        $this->m3u8Id = $this->output . date('YmdHis') . ".{$this->shuffix}";
-    }
-
-
-    /**
-     * @param DecryptionInterface $decryptInstance
-     */
-    public function setDecryptInstance(DecryptionInterface $decryptInstance)
-    {
-        $this->decryptInstance = $decryptInstance;
-    }
-
-    /**
-     * @return DecryptionInterface
-     */
-    public function getDecryptInstance()
-    {
-        return $this->decryptInstance;
+        $this->m3u8Id = $this->output . date('YmdHis') . ".{$this->suffix}";
     }
 
     /**
      * @param $suffix string
      */
-    public function setShuffix($suffix): void
+    public function setSuffix($suffix): void
     {
-        $this->shuffix = $suffix;
+        $this->suffix = $suffix;
     }
 
     /**
@@ -225,38 +219,6 @@ class M3u8File
     public function setSplQueue(\SplQueue $splQueue): void
     {
         $this->splQueue = $splQueue;
-    }
-
-    /**
-     * @return string
-     */
-    public function getDecryptKey(): string
-    {
-        return $this->decryptKey;
-    }
-
-    /**
-     * @param string $decryptKey
-     */
-    public function setDecryptKey(string $decryptKey): void
-    {
-        $this->decryptKey = $decryptKey;
-    }
-
-    /**
-     * @return string
-     */
-    public function getDecryptIV(): string
-    {
-        return $this->decryptIV;
-    }
-
-    /**
-     * @param string $decryptIV
-     */
-    public function setDecryptIV(string $decryptIV): void
-    {
-        $this->decryptIV = $decryptIV;
     }
 
     /**
@@ -336,5 +298,4 @@ class M3u8File
     {
         $this->concurrent = $concurrent;
     }
-
 }

@@ -3,7 +3,8 @@ namespace Downloader\Command;
 
 use Downloader\Parsers\Hua;
 use Downloader\Parsers\YouKu;
-use Downloader\Runner\Decrypt\Aes128;
+use Downloader\Runner\Middleware\AesDecryptMiddleware;
+use Downloader\Runner\Middleware\RsaDecryptMiddleware;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -33,18 +34,17 @@ class StartCommand extends Command
                 'inputConsole' => $input
             ];
         });
-
         $c = new Psr11Container($container);
 
         $downloader = new Downloader($c, $c->get('config'));
         $downloader
             ->setMovieParser(new YouKu(), [
-                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
-                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
-            ], new Aes128())
+                "https://m3u8i.vodfile.m1905.com/202101121627/67b3778169a648f8ef1b83f26832470a/movie/2014/07/08/m2014070882MYZ4QYL20IY6US/m2014070882MYZ4QYL20IY6US-535k.m3u8",
+//                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
+            ], [new AesDecryptMiddleware(), new RsaDecryptMiddleware()])
             ->setMovieParser(new Hua(), [
-                "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
-            ], new Aes128())
+//                "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
+            ])
             ->start();
 
         return Command::SUCCESS;

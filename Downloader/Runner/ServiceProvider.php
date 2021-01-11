@@ -2,6 +2,8 @@
 namespace Downloader\Runner;
 
 use Katzgrau\KLogger\Logger;
+use League\Pipeline\FingersCrossedProcessor;
+use League\Pipeline\Pipeline;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 use ProgressBar\Manager;
@@ -20,11 +22,11 @@ class ServiceProvider implements ServiceProviderInterface
      */
     public function register(Container $container)
     {
-        $container['log.dir'] = function ($c) {
+        $container['log.dir'] = function () {
             return __DIR__ . '/../logs/';
         };
 
-        $container['config'] = function ($c) {
+        $container['config'] = function () {
             return [
                 'output'      => '',
                 'concurrent'  => 25,
@@ -35,7 +37,7 @@ class ServiceProvider implements ServiceProviderInterface
             return new Logger($container['log.dir']);
         };
 
-        $container['bar'] = $container->factory(function (Container $container) {
+        $container['bar'] = $container->factory(function () {
             return new Manager(0, 100, 100);
         });
 
@@ -51,5 +53,9 @@ class ServiceProvider implements ServiceProviderInterface
             $client->setContainer($c);
             return $client;
         });
+
+        $container['middleware'] = function () {
+            return (new Pipeline(new FingersCrossedProcessor));
+        };
     }
 }

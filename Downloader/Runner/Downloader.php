@@ -1,9 +1,10 @@
 <?php declare(strict_types=1);
-
 namespace Downloader\Runner;
 
 use Co\Channel;
-use Downloader\Runner\Decrypt\DecryptionInterface;
+use Downloader\Runner\Middleware\Data\Mu38Data;
+use League\Pipeline\PipelineInterface;
+use League\Pipeline\StageInterface;
 use ProgressBar\Manager;
 use ProgressBar\Registry;
 use Psr\Container\ContainerInterface;
@@ -78,9 +79,9 @@ class Downloader
     protected static $statistics = [];
 
     /**
-     * @var array $decryptInterface
+     * @var array $decryptMiddleware
      */
-    protected $decryptInterface = [];
+    protected $decryptMiddleware = [];
 
     /**
      *
@@ -132,17 +133,27 @@ class Downloader
     /**
      * @param MovieParser $movieParser 解析器实例
      * @param array $params
-     * @param DecryptionInterface|null $decrypt 解密实例
+     * @param array $middleware 解密中间件
      * @return $this
      */
-    public function setMovieParser(MovieParser $movieParser, array $params, DecryptionInterface $decrypt = null)
+    public function setMovieParser(MovieParser $movieParser, array $params, array $middleware = [])
     {
+        // check urls
         foreach ($params as $param) {
             if ($this->hasLegality($param)) {
                 throw new AddressLegalityException($param);
             }
         }
         $this->groupM3u8Sum += count($params);
+
+        // check middleware.
+        foreach ($middleware as $value)
+        {
+            if (!$value instanceof StageInterface)
+            {
+                throw new \LogicException("{$value} invalid middleware.");
+            }
+        }
 
         $movieParser->setContainer($this->container);
         $movieParserClass = get_class($movieParser);
@@ -152,7 +163,7 @@ class Downloader
         }
         // 对象实例
         $this->movieParserInstances[$movieParserClass] = $movieParser;
-        $this->decryptInterface[$movieParserClass] = $decrypt;
+        $this->decryptMiddleware[$movieParserClass] = $middleware;
 
         // 类字符串
         $this->movieParsers[$movieParserClass] = $params;
@@ -179,7 +190,7 @@ class Downloader
              */
             $m3u8Files = $movieParserInstance
                 ->setM3u8s($m3u8List)
-                ->setDecryptionInterface($this->decryptInterface)
+                ->setDecryptMiddleware($this->decryptMiddleware[$movieParserClass])
                 ->setConfig($this->config)
                 ->setInputConsole($this->inputConsole)
                 ->setOutputConsole($this->outputConsole)
@@ -229,13 +240,14 @@ class Downloader
                 $output   = $m3u8File->getOutput();
                 $basename = $m3u8File->getBasename();
                 $hashId   = $m3u8File->getHashId();
+                $count    = $m3u8File->getTsCount();
 
                 // m3u8 file exists.
                 clearstatcache(true, $filename);
                 if (is_file($filename)) {
                     // m3u8 file succeed.
                     static::$m3u8Succeed[$hashId][] = $basename;
-                    static::setSuccess($basename, $filename);
+                    static::setSuccess($basename, $filename, $count);
                     $this->outputConsole->writeln(">> <fg=green>Download M3U8 (#{$id}) video ({$basename}) already exists! </>");
                     $this->outputConsole->write(PHP_EOL);
                     continue;
@@ -247,51 +259,56 @@ class Downloader
 
                 $this->outputConsole->writeln(">> <fg=yellow>Starting to download (#{$id}) M3U8 video [ {$basename} ]: </>");
                 try {
-                    if( $this->downloadM3u8Video($m3u8File) && $this->savingFile($m3u8File) )
-                    {
+                    if(
+                        // Merged fail.
+                        ($failNum = $this->downloadM3u8Video($m3u8File) ) === 0  &&
+                        // Download fail.
+                        ($failNum = $this->mergedTsFragment($m3u8File)) === 0
+                    ) {
                         static::$m3u8Succeed[$hashId][] = $basename;
-                        return;
+                        static::setSuccess($basename, $filename, $count);
+                    } else {
+                        static::setFail($basename, $failNum);
+                        static::$fail[$hashId][] = $basename;
+                        $this->outputConsole->write(PHP_EOL);
+                        $this->outputConsole->writeln(">> <error>Download error ({$basename}) ! </error>");
+                        $this->outputConsole->write(PHP_EOL);
                     }
-                    static::setFail($basename);
-                    static::$m3u8Fail[$hashId][] = $basename;
-                    $this->outputConsole->write(PHP_EOL);
-                    $this->outputConsole->writeln(">> <error>Download error ({$basename}) ! </error>");
-
-                    $this->outputConsole->write(PHP_EOL);
+                    // statistics info.
+                    $this->outputConsole->writeln(">> <info>Download statistics:</info>");
+                    $this->statisticsTable();
                 } catch (\Throwable $e) {
                     $this->container->get('log')->record($e);
                 }
             }
         }
-
-        // statistics info.
-        $this->outputConsole->writeln(">> <info>Download statistics:</info>");
-        $this->statisticsTable();
     }
 
-    public static function setSuccess($basename, $filename) {
+    public static function setSuccess($basename, $filename, $count) {
         static::$statistics[$basename] = array(
             'basename' => $basename,
-            'size' => Utils::fileSize(filesize($filename)),
-            'status' => '<info>succeed</info>', // success
+            'size'     => Utils::fileSize(filesize($filename)),
+            'status'   => '<info>succeed</info>', // success
+            'fail_num'   => $count
         );
     }
 
-    public static function setFail($basename)
+    public static function setFail($basename, $fails)
     {
         static::$statistics[$basename] = array(
-            'basename'  => $basename,
-            'size' => '0B',
-            'status' => '<error>fail</error>', // fail
+            'basename' => $basename,
+            'size'     => '0B',
+            'status'   => '<error>fail</error>', // fail
+            'fail_num'   => "<error>{$fails}</error>"
         );
     }
 
     /**
      * 开始下载任务M3u8文件
      * @param M3u8File $m3u8File
-     * @return bool
+     * @return int
      */
-    protected function downloadM3u8Video(M3u8File $m3u8File): bool
+    protected function downloadM3u8Video(M3u8File $m3u8File): int
     {
         $tsCount  = $m3u8File->getTsCount();
         $wg       = $m3u8File->getChannel();
@@ -311,17 +328,18 @@ class Downloader
         }
         $m3u8File->closedChannel();
 
-        return count(static::$fail[$hashId] ?? []) < 1; // true : succeed, false: fail
+        // download failed
+        return count(static::$fail[$hashId] ?? []);
     }
 
     // downloading ts .....
     protected function downloadTsFragment(M3u8File $m3u8File, Manager $progressBar, Channel $wg, string $remoteTs)
     {
         // Single process statistics.
-        $output   = $m3u8File->getOutput();
-        $basename = basename($remoteTs);
-        $hashId   = $m3u8File->getHashId();
-        $targetTs = "{$output}/{$basename}";
+        $output     = $m3u8File->getOutput();
+        $basename   = basename($remoteTs);
+        $hashId     = $m3u8File->getHashId();
+        $targetTs   = "{$output}/{$basename}";
 
         // ts file exists.
         clearstatcache(true, $targetTs);
@@ -351,13 +369,20 @@ class Downloader
                 // > 2mb ts file size.
                 if ($client->getBodySize() > 2 * 1024) {
                     $data = $client->getBody();
+
                     // decrypt ts file.
-                    if ($m3u8File->getDecryptKey()) {
-                        $data = $m3u8File->getDecryptInstance()->decrypt(
-                            $data,
-                            $m3u8File->getDecryptKey(),
-                            $m3u8File->getDecryptIV()
-                        );
+                    if ($middleware = $m3u8File->getDecryptMiddleware())
+                    {
+                        /**
+                         * @var $pipeline PipelineInterface
+                         */
+                        $pipeline = $this->container->get('middleware');
+
+                        foreach ($middleware as $value)
+                        {
+                            $pipeline = $pipeline->pipe($value);
+                        }
+                        $data = $pipeline->process(new Mu38Data($m3u8File->getM3u8UrlData(), $data));
                     }
 
                     if ($data) {
@@ -379,11 +404,11 @@ class Downloader
     }
 
     /**
-     * 开始合并下载任务
+     * 开始合并下载任务,返回文件失败数量
      * @param M3u8File $m3u8File
-     * @return bool
+     * @return int
      */
-    protected function savingFile(M3u8File $m3u8File) :bool
+    protected function mergedTsFragment(M3u8File $m3u8File) :int
     {
         $output       = $m3u8File->getOutput();
         $tsCount      = $m3u8File->getTsCount();
@@ -420,10 +445,11 @@ class Downloader
                     Utils::writeFile($videoFile, $data, true);
                     @unlink($ts);
                     $progressBar->advance();
-                    static::setSuccess($basename, $videoFile);
+                    static::setSuccess($basename, $videoFile, $count);
                 }
             }
 
+            // Merger complete.
             if ($splArray->count() === $count)
             {
                 // 成功文件记录
@@ -433,17 +459,18 @@ class Downloader
                 // println
                 $this->outputConsole->write(PHP_EOL.PHP_EOL);
 
-                return true;
+                return 0;
             }
-            // download fail. write log ....
-            return false;
+            // Merge failed. write log .
         }
+        // Download failed.
+        return $splArray->count() - $successes;
     }
 
     protected function statisticsTable()
     {
         $table = new Table($this->outputConsole);
-        $table->setHeaders(array('编号', '文件名称',  '文件大小', '下载状态'));
+        $table->setHeaders(array('编号', '文件名称',  '文件大小', '下载状态', '分片总量'));
 
         $id = 0;
         foreach (static::$statistics as $key => $value)
@@ -459,13 +486,12 @@ class Downloader
 
     public function baseInfo(): string
     {
-        $baseInfo = sprintf("StartTime: %s, Os: %s, Swoole: %s, PHP: %s.",
+        $base = sprintf(
+            "Start up: %s, Os: %s, Swoole: %s, PHP: %s.",
             date('Y-m-d H:i:s'),
-            PHP_OS,
-            SWOOLE_VERSION,
-            phpversion()
+            PHP_OS, SWOOLE_VERSION, phpversion()
         );
 
-        return $baseInfo;
+        return $base;
     }
 }

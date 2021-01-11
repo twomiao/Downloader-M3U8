@@ -12,7 +12,7 @@ class YouKu extends MovieParser
      */
     protected function parsedTsUrl(string $m3u8Url, string $movieTs): string
     {
-        $url = str_replace("index.m3u8", "", $m3u8Url);
+        $url = str_replace("m2014070882MYZ4QYL20IY6US-535k.m3u8", "", $m3u8Url);
 
         return "{$url}{$movieTs}";
     }
@@ -34,6 +34,5 @@ class YouKu extends MovieParser
 
         return $data;
     }
-
 
 }
