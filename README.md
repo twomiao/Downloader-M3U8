@@ -33,7 +33,8 @@ Downloader M3U8目录结构：
 ```
 |-- Downloader-M3U8
     |-- Downloader 
-        |-- Runner  实现代码 
+        |-- Runner  库代码 
+        |-- Command  自定义命令 
         |-- Parsers 解析ts规则
             |-- M1905.php -> www.1905.com
             |-- ..... 更多脚本文件
@@ -73,6 +74,7 @@ class YouKu extends MovieParser
 #### 解密视频：
 ```
 <?php
+
 namespace Downloader\Runner\Middleware;
 
 use Downloader\Runner\HttpClient;
@@ -93,61 +95,14 @@ class AesDecryptMiddleware implements StageInterface
      */
     public function __invoke($data)
     {
-        return $data;
-    }
-
-    /**
-     * 获取加密KEY
-     * @param string $data
-     * @return array|null
-     */
-    protected function getDecryptionParameters(string $data): ?array
-    {
-        $keyInfo = $this->getParsekey($data);
-        if ($keyInfo) {
-            /**
-             * @var $client HttpClient
-             */
-            $client = $this->container->get('client');
-
-            try {
-                $client->get()->request($keyInfo['keyUri']);
-                if ($client->isSucceed()) {
-                    $keyInfo['key'] = $client->getBody();
-                    return $keyInfo;
-                }
-            } catch (RetryRequestException $e) {
-                throw $e;
-            }
-        }
-
-        return [];
-    }
-
-    protected function getParsekey($data)
-    {
-        $doesIt = preg_match("#\#EXT-X-KEY:METHOD=(.*?)\#EXTINF#is", $data, $matches);
-
-        if ($doesIt) {
-            $line = trim($matches[1]);
-            $result = explode(',', $line);
-            $method = $result[0];
-            preg_match('/URI="(.*?)"/is', $result[1], $keyUri);
-            $keyUri = $keyUri[1];
-
-            switch (count($result)) {
-                case 2:
-                    return compact('method', 'keyUri');
-                case 3:
-                    $vi = $result[2];
-                    return compact('method', 'keyUri', 'vi');
-                default:
-                    break;
-            }
-        }
-        return [];
+        return $data->getRawData();
     }
 }
+
+
+
+use Downloader\Runner\Middleware\Data\Mu38Data;
+use League\Pipeline\StageInterface;
 
 /**
  * 解密RSA视频
@@ -235,10 +190,13 @@ class StartCommand extends Command
         $downloader
             ->setMovieParser(new YouKu(), [
                 "https://m3u8i.vodfile.m1905.com/202101121627/67b3778169a648f8ef1b83f26832470a/movie/2014/07/08/m2014070882MYZ4QYL20IY6US/m2014070882MYZ4QYL20IY6US-535k.m3u8",
-                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
-            ], [new AesDecryptMiddleware(), new RsaDecryptMiddleware()])
+//                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
+            ], array(
+                new AesDecryptMiddleware,
+                new RsaDecryptMiddleware
+            ))
             ->setMovieParser(new Hua(), [
-                "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
+//                "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
             ])
             ->start();
 
