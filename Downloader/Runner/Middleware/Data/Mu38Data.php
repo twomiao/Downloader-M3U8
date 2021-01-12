@@ -11,14 +11,14 @@ class Mu38Data
 
     /**
      * ts 视频文件加密内容
-     * @var string $tsEncryptedData
+     * @var string $tsRawData
      */
-    protected $tsEncryptedData;
+    protected $tsRawData;
 
-    public function __construct(string $dataMu38url, string $tsEncryptedData)
+    public function __construct(string $dataMu38url, $rawData)
     {
         $this->dataMu38url = $dataMu38url;
-        $this->tsEncryptedData = $tsEncryptedData;
+        $this->tsRawData = $rawData;
     }
 
     /**
@@ -32,9 +32,9 @@ class Mu38Data
     /**
      * @return string
      */
-    public function getTsEncryptedData(): string
+    public function getRawData(): string
     {
-        return $this->tsEncryptedData;
+        return $this->tsRawData;
     }
 
 }
