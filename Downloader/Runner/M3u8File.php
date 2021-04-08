@@ -257,7 +257,7 @@ class M3u8File
     /**
      * @return Channel|null
      */
-    public function getChannel(): ?Channel
+    public function getChannel(): ?\Swoole\Coroutine\Channel
     {
         return $this->channel;
     }
@@ -265,7 +265,7 @@ class M3u8File
     /**
      * @param Channel|null $channel
      */
-    public function setChannel(?Channel $channel): void
+    public function setChannel(?\Swoole\Coroutine\Channel $channel): void
     {
         $this->channel = $channel;
     }

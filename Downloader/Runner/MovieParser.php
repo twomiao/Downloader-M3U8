@@ -2,7 +2,7 @@
 namespace Downloader\Runner;
 
 use Co\Channel;
-use Co\WaitGroup;
+use Swoole\Coroutine\WaitGroup;
 use ProgressBar\Manager;
 use ProgressBar\Registry;
 use Psr\Container\ContainerInterface;
@@ -80,7 +80,7 @@ abstract class MovieParser
         foreach ($this->m3u8Urls as $index => $m3u8Url) {
             $wg->add();
             Coroutine::create(function (WaitGroup $wg, $m3u8Url, Manager $progressBar, $index) {
-                defer(function () use ($wg, $progressBar)
+                \Swoole\Coroutine::defer(function () use ($wg, $progressBar)
                 {
                     $wg->done();
                 });
@@ -125,7 +125,7 @@ abstract class MovieParser
                             $m3u8File->setOutput($this->getOutputDir());
                             $m3u8File->setM3u8Id($index);
                             $m3u8File->setTsCount($splQueue->count());
-                            $m3u8File->setChannel(new Channel($this->getConcurrentNumber()));
+                            $m3u8File->setChannel(new \Swoole\Coroutine\Channel($this->getConcurrentNumber()));
                             $m3u8File->setMergedTsArray($splArray);
                             $m3u8File->setConcurrent($this->getConcurrentNumber());
                             $m3u8File->setBindTsMap($tsBindMap);

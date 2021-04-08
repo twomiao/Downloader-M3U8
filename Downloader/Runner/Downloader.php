@@ -1,7 +1,6 @@
 <?php declare(strict_types=1);
 namespace Downloader\Runner;
 
-use Co\Channel;
 use Downloader\Runner\Middleware\Data\Mu38Data;
 use League\Pipeline\PipelineInterface;
 use League\Pipeline\StageInterface;
@@ -61,17 +60,6 @@ class Downloader
      * @var array $m3u8Succeed
      */
     protected static $m3u8Succeed = [];
-
-    /**
-     * m3u8 fail
-     * @var array $m3u8Fail
-     */
-    protected static $m3u8Fail = [];
-
-    /**
-     * @var array $videoUrls
-     */
-    protected static $videoUrls = [];
 
     /**
      * @var array $statistics
@@ -243,7 +231,7 @@ class Downloader
                 $count    = $m3u8File->getTsCount();
 
                 // m3u8 file exists.
-                clearstatcache(true, $filename);
+                clearstatcache(true);
                 if (is_file($filename)) {
                     // m3u8 file succeed.
                     static::$m3u8Succeed[$hashId][] = $basename;
@@ -333,7 +321,7 @@ class Downloader
     }
 
     // downloading ts .....
-    protected function downloadTsFragment(M3u8File $m3u8File, Manager $progressBar, Channel $wg, string $remoteTs)
+    protected function downloadTsFragment(M3u8File $m3u8File, Manager $progressBar, Coroutine\Channel $wg, string $remoteTs)
     {
         // Single process statistics.
         $output     = $m3u8File->getOutput();
@@ -352,7 +340,7 @@ class Downloader
         // download ts file.
         $wg->push(true);
         Coroutine::create(function () use ($progressBar, $wg, $m3u8File, $remoteTs, $targetTs, $basename, $hashId) {
-            defer(function () use ($wg) {
+            \Swoole\Coroutine::defer(function () use ($wg) {
                 // 5s exited coroutine.
                 $wg->pop(2);
             });

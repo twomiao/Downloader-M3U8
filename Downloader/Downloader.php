@@ -6,7 +6,7 @@ use Downloader\Runner\Downloader as Downloader;
 use Symfony\Component\Console\Application;
 use Downloader\Command\StartCommand;
 
-\Co\run(function () {
+\Swoole\Coroutine::create(function () {
     Runtime::enableCoroutine(true, SWOOLE_HOOK_ALL);
 
     $application = new Application('Downloader-M3u8', Downloader::VERSION);

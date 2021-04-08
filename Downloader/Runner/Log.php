@@ -28,9 +28,9 @@ class Log
         if ($e instanceof \Error) {
             $this->logger->error($e->getMessage());
         } elseif ($e instanceof DownloaderException) {
-            $this->logger->debug($e->getMessage());
+            $this->logger->error($e->getMessage());
         } else {
-            $this->logger->notice($e->getMessage());
+            $this->logger->debug($e->getMessage());
         }
     }
 }
