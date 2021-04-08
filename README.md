@@ -1,5 +1,7 @@
 ##### Downloader M3U8：
-<img src="https://img-blog.csdnimg.cn/20210408183351410.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L20wXzM3MDgyOTYy,size_16,color_FFFFFF,t_70" width="750" height="500" alt="downloading"/>
+<img src="https://img-blog.csdnimg.cn/20210408183351410.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L20wXzM3MDgyOTYy,size_16,color_FFFFFF,t_70" width="750" height="500" alt="正常下载完成"/>
+<br/>
+<img src="https://img-blog.csdnimg.cn/20210408212123250.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L20wXzM3MDgyOTYy,size_16,color_FFFFFF,t_70" width="750" height="500" alt="网络问题，下载失败"/>
 
 #### M3U8简介：
 > m3u8准确来说是一种索引文件，使用m3u8文件实际上是通过它来解析对应的放在服务器上的视频网络地址，从而实现在线播放。使用m3u8格式文件主要因为可以实现多码率视频的适配，视频网站可以根据用户的网络带宽情况，自动为客户端匹配一个合适的码率文件进行播放，从而保证视频的流畅度。
@@ -79,7 +81,6 @@ namespace Downloader\Runner\Middleware;
 
 use Downloader\Runner\HttpClient;
 use Downloader\Runner\Middleware\Data\Mu38Data;
-use Downloader\Runner\RetryRequestException;
 use League\Pipeline\StageInterface;
 
 /**
@@ -95,41 +96,37 @@ class AesDecryptMiddleware implements StageInterface
      */
     public function __invoke($data)
     {
-        return $this->decrypt($data->getRawData());
+        return $this->decrypt($data->getAuthkeyUrl(), $data->getRawData());
     }
 
-    protected function decrypt($data)
+    protected function decrypt($authKeyUrl, $rawData)
     {
-        $password = "f8e85a27aba9bafa";
-        $data = openssl_decrypt($data, 'aes-128-cbc', $password,OPENSSL_RAW_DATA);
+        [$authKey, $authMethod] = $this->parseKey($authKeyUrl);
+        $data = openssl_decrypt($rawData, $authMethod, $authKey, OPENSSL_RAW_DATA);
         return $data;
+    }
+
+    protected function parseKey($authKeyUrl): ?array
+    {
+        preg_match('@(.*?),URI=\"(.*?)\"@Ui', $authKeyUrl, $res);
+
+        $client = new HttpClient();
+
+        $client->get()->request($res[2]);
+
+        $authKey = $client->getBody();
+
+        $result = array(
+            $authKey,
+            'aes-128-cbc'
+        );
+
+        return $result;
     }
 }
 
+more ......
 
-
-use Downloader\Runner\Middleware\Data\Mu38Data;
-use League\Pipeline\StageInterface;
-
-/**
- * 解密RSA视频
- * Class RsaDecryptMiddleware
- * @package Downloader\Runner\Middleware
- */
-class RsaDecryptMiddleware implements StageInterface
-{
-    /**
-     * Process the payload.
-     *
-     * @param Mu38Data $data
-     *
-     * @return mixed
-     */
-    public function __invoke($data)
-    {
-        return $data;
-    }
-}
 ```
 
 #### php Downloader.php start：
