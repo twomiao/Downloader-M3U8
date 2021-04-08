@@ -5,9 +5,9 @@ class Mu38Data
 {
     /**
      * ts 列表
-     * @var string $dataMu38url
+     * @var string $authKeyUrl
      */
-    protected $dataMu38url;
+    protected $authKeyUrl;
 
     /**
      * ts 视频文件加密内容
@@ -15,18 +15,18 @@ class Mu38Data
      */
     protected $tsRawData;
 
-    public function __construct(string $dataMu38url, $rawData)
+    public function __construct(string $authKeyUrl, $rawData)
     {
-        $this->dataMu38url = $dataMu38url;
+        $this->authKeyUrl = $authKeyUrl;
         $this->tsRawData = $rawData;
     }
 
     /**
      * @return string
      */
-    public function getDataMu38url(): string
+    public function getAuthkeyUrl(): string
     {
-        return $this->dataMu38url;
+        return $this->authKeyUrl;
     }
 
     /**
@@ -36,5 +36,4 @@ class Mu38Data
     {
         return $this->tsRawData;
     }
-
 }

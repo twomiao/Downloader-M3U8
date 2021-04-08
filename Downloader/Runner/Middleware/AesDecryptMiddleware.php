@@ -4,7 +4,6 @@ namespace Downloader\Runner\Middleware;
 
 use Downloader\Runner\HttpClient;
 use Downloader\Runner\Middleware\Data\Mu38Data;
-use Downloader\Runner\RetryRequestException;
 use League\Pipeline\StageInterface;
 
 /**
@@ -20,13 +19,31 @@ class AesDecryptMiddleware implements StageInterface
      */
     public function __invoke($data)
     {
-        return $this->decrypt($data->getRawData());
+        return $this->decrypt($data->getAuthkeyUrl(), $data->getRawData());
     }
 
-    protected function decrypt($data)
+    protected function decrypt($authKeyUrl, $rawData)
     {
-        $password = "f8e85a27aba9bafa";
-        $data = openssl_decrypt($data, 'aes-128-cbc', $password,OPENSSL_RAW_DATA);
+        [$authKey, $authMethod] = $this->parseKey($authKeyUrl);
+        $data = openssl_decrypt($rawData, $authMethod, $authKey, OPENSSL_RAW_DATA);
         return $data;
+    }
+
+    protected function parseKey($authKeyUrl): ?array
+    {
+        preg_match('@(.*?),URI=\"(.*?)\"@Ui', $authKeyUrl, $res);
+
+        $client = new HttpClient();
+
+        $client->get()->request($res[2]);
+
+        $authKey = $client->getBody();
+
+        $result = array(
+            $authKey,
+            'aes-128-cbc'
+        );
+
+        return $result;
     }
 }

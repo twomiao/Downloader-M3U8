@@ -39,10 +39,9 @@ class StartCommand extends Command
         $downloader = new Downloader($c, $c->get('config'));
         $downloader
             ->setMovieParser(new YouKu(), [
-                "https://vod.xxx.com/20210322/RIn5ERXl/1000kb/hls/index.m3u8"
 //                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
             ], array(
-                new AesDecryptMiddleware,
+//                new AesDecryptMiddleware,
 //                new RsaDecryptMiddleware
             ))
             ->setMovieParser(new Hua(), [

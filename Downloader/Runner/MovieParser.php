@@ -65,6 +65,23 @@ abstract class MovieParser
      */
     abstract protected function parsedTsUrl(string $m3u8Url, string $movieTs): string;
 
+
+    /**
+     * 解析KEY
+     * @param string $indexM3u8
+     * @return string
+     */
+    protected function authKey(string $indexM3u8) : string
+    {
+        $authKey = '';
+
+        if (preg_match('#\#EXT-X-KEY:METHOD=(.*?)#Ui', $indexM3u8, $matches))
+        {
+            $authKey =  $matches[1] ?? '';
+        }
+        return $authKey;
+    }
+
     public function runParser(): ?array
     {
         $wg = new WaitGroup();
@@ -120,6 +137,7 @@ abstract class MovieParser
                             }
 
                             // M3u8File Object.
+                            $m3u8File->setAuthKey($authKey = $this->authKey($data));
                             $m3u8File->setSplQueue($splQueue);
                             $m3u8File->setGroupId($this->movieParserClass);
                             $m3u8File->setOutput($this->getOutputDir());

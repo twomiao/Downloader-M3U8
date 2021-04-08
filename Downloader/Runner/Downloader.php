@@ -370,7 +370,7 @@ class Downloader
                         {
                             $pipeline = $pipeline->pipe($value);
                         }
-                        $data = $pipeline->process(new Mu38Data($m3u8File->getM3u8UrlData(), $data));
+                        $data = $pipeline->process(new Mu38Data($m3u8File->getAuthKey(), $data));
                     }
 
                     if ($data) {

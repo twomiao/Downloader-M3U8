@@ -73,6 +73,21 @@ class M3u8File
     protected $bindTsMap = [];
 
     /**
+     * @var string $authKey
+     */
+    protected $authKey;
+
+    public function setAuthKey(string $authKey) : void
+    {
+        $this->authKey = $authKey;
+    }
+
+    public function getAuthKey() : string
+    {
+       return $this->authKey;
+    }
+
+    /**
      * 获取解密中间件集合
      * @return array
      */
