@@ -16,25 +16,7 @@ class YouKu extends MovieParser
 //
 //        return "{$url}{$movieTs}";
 //        var_dump($movieTs);
-        return $movieTs;
+
+        return 'https://m3u8i.vodfile.m1905.com/202104111303/5750d10b976913b603178623791ce8b2/movie/2019/11/01/m201911013H75YYU0X8TGQ5XV/'.$movieTs;
     }
-
-    protected function getParsekey($data)
-    {
-        $data = parent::getParsekey($data);
-
-        /**
-         * array(2) {
-         *["method"]=>
-         *string(7) "AES-128"
-         *["keyUri"]=>
-         *string(7) "key.key"
-         *}
-         */
-//        $keyUri = $data['keyUri'];
-//        $data['keyUri'] =  "https://.......com/81820200424/GC0229379/1000kb/hls/{$keyUri}";
-
-        return $data;
-    }
-
 }

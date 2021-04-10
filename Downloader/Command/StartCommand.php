@@ -39,14 +39,13 @@ class StartCommand extends Command
         $downloader = new Downloader($c, $c->get('config'));
         $downloader
             ->setMovieParser(new YouKu(), [
-//                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
+                "https://m3u8i.vodfile.m1905.com/202104111303/5750d10b976913b603178623791ce8b2/movie/2019/11/01/m201911013H75YYU0X8TGQ5XV/31F7C75013716C57F444253B3.m3u8"
             ], array(
+                /***
+                 *  视频本身未加密，因此无需中间件
+                 */
 //                new AesDecryptMiddleware,
-//                new RsaDecryptMiddleware
             ))
-            ->setMovieParser(new Hua(), [
-//                "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
-            ])
             ->start();
 
         return Command::SUCCESS;

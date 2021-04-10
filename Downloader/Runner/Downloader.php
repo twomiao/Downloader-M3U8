@@ -195,9 +195,15 @@ class Downloader
                 }
             }
         }
-        $this->outputConsole->write(PHP_EOL);
-        $this->outputConsole->writeln(">> <fg=black;bg=green>Get ({$this->groupM3u8Sum}) tasks, start downloading: </>");
-        $this->outputConsole->write(PHP_EOL);
+
+        if (empty($data))
+        {
+            $this->outputConsole->writeln(">> <fg=black;bg=yellow>No task found! </>");
+        } else {
+            $this->outputConsole->write(PHP_EOL);
+            $this->outputConsole->writeln(">> <fg=black;bg=green>Found ({$this->groupM3u8Sum}) tasks: </>");
+            $this->outputConsole->write(PHP_EOL);
+        }
 
         return $data;
     }
@@ -245,7 +251,7 @@ class Downloader
                     throw new \RuntimeException("Mkdir fail, dir is:{$output}.");
                 }
 
-                $this->outputConsole->writeln(">> <fg=yellow>Starting to download (#{$id}) M3U8 video [ {$basename} ]: </>");
+                $this->outputConsole->writeln(">> <fg=yellow>Download task [ {$basename} - {$id} ]: </>");
                 try {
                     if(
                         // Merged fail.
@@ -263,7 +269,7 @@ class Downloader
                         $this->outputConsole->write(PHP_EOL);
                     }
                     // statistics info.
-                    $this->outputConsole->writeln(">> <info>Download statistics:</info>");
+                    $this->outputConsole->writeln(">> <info>Task list:</info>");
                     $this->statisticsTable();
                 } catch (\Throwable $e) {
                     $this->container->get('log')->record($e);
@@ -475,7 +481,7 @@ class Downloader
     public function baseInfo(): string
     {
         $base = sprintf(
-            "Start up: %s, Os: %s, Swoole: %s, PHP: %s.",
+            "Downloader-M3U8: %s, Os: %s, Swoole: %s, PHP: %s.",
             date('Y-m-d H:i:s'),
             PHP_OS, SWOOLE_VERSION, phpversion()
         );
