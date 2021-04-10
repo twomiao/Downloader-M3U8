@@ -201,7 +201,7 @@ class Downloader
             $this->outputConsole->writeln(">> <fg=black;bg=yellow>No task found! </>");
         } else {
             $this->outputConsole->write(PHP_EOL);
-            $this->outputConsole->writeln(">> <fg=black;bg=green>Found ({$this->groupM3u8Sum}) tasks. </>");
+            $this->outputConsole->writeln(">> <fg=black;bg=green>Found ({$this->groupM3u8Sum}) tasks.  </>");
             $this->outputConsole->write(PHP_EOL);
         }
 
