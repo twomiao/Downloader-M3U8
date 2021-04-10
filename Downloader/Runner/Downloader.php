@@ -161,7 +161,7 @@ class Downloader
     protected function m3u8Files(): array
     {
         $this->outputConsole->write(PHP_EOL);
-        $this->outputConsole->writeln(">> <fg=white>Retrieving remote file information: </>");
+        $this->outputConsole->writeln(">> <fg=white>Searching task data: </>");
         $this->outputConsole->write(PHP_EOL);
 
         // m3u8 files
@@ -201,7 +201,7 @@ class Downloader
             $this->outputConsole->writeln(">> <fg=black;bg=yellow>No task found! </>");
         } else {
             $this->outputConsole->write(PHP_EOL);
-            $this->outputConsole->writeln(">> <fg=black;bg=green>Found ({$this->groupM3u8Sum}) tasks: </>");
+            $this->outputConsole->writeln(">> <fg=black;bg=green>Found ({$this->groupM3u8Sum}) tasks. </>");
             $this->outputConsole->write(PHP_EOL);
         }
 
@@ -242,7 +242,7 @@ class Downloader
                     // m3u8 file succeed.
                     static::$m3u8Succeed[$hashId][] = $basename;
                     static::setSuccess($basename, $filename, $count);
-                    $this->outputConsole->writeln(">> <fg=green>Download M3U8 (#{$id}) video ({$basename}) already exists! </>");
+                    $this->outputConsole->writeln(">> <fg=green>[{$basename} - {$id}] file found on the local disk! </>");
                     $this->outputConsole->write(PHP_EOL);
                     continue;
                 }
@@ -415,7 +415,7 @@ class Downloader
         if ($successes === $splArray->count())
         {
             $realpath = realpath($output);
-            $this->outputConsole->writeln(">> <info>Saving files：[ {$realpath}.mp4 ]</info>");
+            $this->outputConsole->writeln(">> <info>Writing file: [ {$realpath}.mp4 ]</info>");
 
             /**
              * @var $progressBar Manager
@@ -449,7 +449,7 @@ class Downloader
                 // 成功文件记录
                 static::$m3u8Succeed[]             = $basename;
 
-                $this->outputConsole->writeln(">> <fg=black;bg=green>Download [ {$basename} ] file complete!</>");
+                $this->outputConsole->writeln(">> <fg=black;bg=green>Download task [ {$basename} ] completed!</>");
                 // println
                 $this->outputConsole->write(PHP_EOL.PHP_EOL);
 
