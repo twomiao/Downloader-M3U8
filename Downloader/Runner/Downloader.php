@@ -345,56 +345,69 @@ class Downloader
 
         // download ts file.
         $wg->push(true);
-        Coroutine::create(function () use ($progressBar, $wg, $m3u8File, $remoteTs, $targetTs, $basename, $hashId) {
-            \Swoole\Coroutine::defer(function () use ($wg) {
-                // 5s exited coroutine.
-                $wg->pop(2);
-            });
+        Coroutine::create
+        (
+            '\\Downloader\\Runner\\Downloader::coDownload',
+            $progressBar,
+            $wg,
+            $m3u8File,
+            $remoteTs,
+            $targetTs,
+            $basename,
+            $hashId
+        );
+    }
 
-            try {
-                /**
-                 * @var HttpClient $client
-                 */
-                $client = $this->container->get('client');
-
-                // request ts file.
-                $client->get()->request($remoteTs);
-
-                // > 2mb ts file size.
-                if ($client->getBodySize() > 2 * 1024) {
-                    $data = $client->getBody();
-
-                    // decrypt ts file.
-                    if ($middleware = $m3u8File->getDecryptMiddleware())
-                    {
-                        /**
-                         * @var $pipeline PipelineInterface
-                         */
-                        $pipeline = $this->container->get('middleware');
-
-                        foreach ($middleware as $value)
-                        {
-                            $pipeline = $pipeline->pipe($value);
-                        }
-                        $data = $pipeline->process(new Mu38Data($m3u8File->getAuthKey(), $data));
-                    }
-
-                    if ($data) {
-                        static::$succeed[$hashId][] = $basename;
-                        Utils::writeFile($targetTs, $data);
-                        $progressBar->advance();
-                    }
-                    return;
-                }
-                // fail ts file.
-                static::$fail[$hashId][] = $remoteTs;
-
-            } catch (RetryRequestException $e) {
-                $this->container->get('log')->record($e);
-                // fail ts file.
-                static::$fail[$hashId][] = $remoteTs;
-            }
+    public function coDownload($progressBar, $wg, $m3u8File, $remoteTs, $targetTs, $basename, $hashId)
+    {
+        \Swoole\Coroutine::defer(function () use ($wg) {
+            // 5s exited coroutine.
+            $wg->pop(5);
         });
+
+        try {
+            /**
+             * @var HttpClient $client
+             */
+            $client = $this->container->get('client');
+
+            // request ts file.
+            $client->get()->request($remoteTs);
+
+            // > 2mb ts file size.
+            if ($client->getBodySize() > 2 * 1024) {
+                $data = $client->getBody();
+
+                // decrypt ts file.
+                if ($middleware = $m3u8File->getDecryptMiddleware())
+                {
+                    /**
+                     * @var $pipeline PipelineInterface
+                     */
+                    $pipeline = $this->container->get('middleware');
+
+                    foreach ($middleware as $value)
+                    {
+                        $pipeline = $pipeline->pipe($value);
+                    }
+                    $data = $pipeline->process(new Mu38Data($m3u8File->getAuthKey(), $data));
+                }
+
+                if ($data) {
+                    static::$succeed[$hashId][] = $basename;
+                    Utils::writeFile($targetTs, $data);
+                    $progressBar->advance();
+                }
+                return;
+            }
+            // fail ts file.
+            static::$fail[$hashId][] = $remoteTs;
+
+        } catch (RetryRequestException $e) {
+            $this->container->get('log')->record($e);
+            // fail ts file.
+            static::$fail[$hashId][] = $remoteTs;
+        }
     }
 
     /**

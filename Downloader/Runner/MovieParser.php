@@ -1,4 +1,5 @@
 <?php declare(strict_types=1);
+
 namespace Downloader\Runner;
 
 use Co\Channel;
@@ -71,13 +72,12 @@ abstract class MovieParser
      * @param string $indexM3u8
      * @return string
      */
-    protected function authKey(string $indexM3u8) : string
+    protected function authKey(string $indexM3u8): string
     {
         $authKey = '';
 
-        if (preg_match('#\#EXT-X-KEY:METHOD=(.*?)#Ui', $indexM3u8, $matches))
-        {
-            $authKey =  $matches[1] ?? '';
+        if (preg_match('#\#EXT-X-KEY:METHOD=(.*?)#Ui', $indexM3u8, $matches)) {
+            $authKey = $matches[1] ?? '';
         }
         return $authKey;
     }
@@ -96,84 +96,95 @@ abstract class MovieParser
 
         foreach ($this->m3u8Urls as $index => $m3u8Url) {
             $wg->add();
-            Coroutine::create(function (WaitGroup $wg, $m3u8Url, Manager $progressBar, $index) {
-                \Swoole\Coroutine::defer(function () use ($wg, $progressBar)
-                {
-                    $wg->done();
-                });
-
-                /**
-                 * @var $client HttpClient
-                 */
-                $client = $this->container->get('client');
-
-                try {
-                    $client->get()->request(trim($m3u8Url));
-
-                    if ($client->getBodySize() > self::DOWNLOAD_FILE_MAX) {
-                        $m3u8File = new M3u8File();
-                        $this->m3u8Files[$index] = $m3u8File;
-
-                        // make queue
-                        [$splQueue, $data, $tsBindMap] =
-                            array(
-                                 new \SplQueue(),
-                                $client->getBody(),
-                                array()
-                             );
-
-                        // Get ts list from M3U8 file.
-                        if ($tsUrls = $this->readTSFileUrls($data))
-                        {
-                            $splArray = new \SplFixedArray(count($tsUrls));
-                            foreach ($tsUrls as $id => $ts) {
-                                // 完整ts地址
-                                $fromTsFile = trim($ts) . '.ts';
-                                $tsUrl = $this->parsedTsUrl($m3u8Url, $fromTsFile);
-                                $splQueue->add($id, $tsUrl);
-                                $basename = basename($tsUrl);
-                                $tsBindMap[$basename] = $tsUrl;
-                                $splArray[$id] = $basename;
-                            }
-
-                            // M3u8File Object.
-                            $m3u8File->setAuthKey($authKey = $this->authKey($data));
-                            $m3u8File->setSplQueue($splQueue);
-                            $m3u8File->setGroupId($this->movieParserClass);
-                            $m3u8File->setOutput($this->getOutputDir());
-                            $m3u8File->setM3u8Id($index);
-                            $m3u8File->setTsCount($splQueue->count());
-                            $m3u8File->setChannel(new \Swoole\Coroutine\Channel($this->getConcurrentNumber()));
-                            $m3u8File->setMergedTsArray($splArray);
-                            $m3u8File->setConcurrent($this->getConcurrentNumber());
-                            $m3u8File->setBindTsMap($tsBindMap);
-                            $m3u8File->setM3u8UrlData($data);
-                            $m3u8File->setDecryptMiddleware($this->decryptMiddleware);
-                            // add progressbar:1
-                            $progressBar->advance();
-                        }
-                    }
-                } catch (RetryRequestException $e) {
-                    $this->container->get('log')->record($e);
-                }
-            }, $wg, $m3u8Url, $progressBar, $index);
+            Coroutine::create
+            (
+                '\\Downloader\\Runner\\MovieParser::m3u8Object',
+                $wg,
+                $m3u8Url,
+                $progressBar,
+                $index,
+                $wg,
+                $m3u8Url,
+                $progressBar,
+                $index
+            );
         }
         if ($wg->wait(60) === false) {
             throw new \RuntimeException(
-                'Channel timeout, failed file information::' . var_export($this->m3u8Urls, true)
+                'Download timeout, failed file information::' . var_export($this->m3u8Urls, true)
             );
         }
         return $this->m3u8Files;
+    }
+
+    public function m3u8Object(WaitGroup $wg, $m3u8Url, Manager $progressBar, $index, $wg, $m3u8Url, $progressBar, $index)
+    {
+        \Swoole\Coroutine::defer(function () use ($wg, $progressBar) {
+            $wg->done();
+        });
+
+        /**
+         * @var $client HttpClient
+         */
+        $client = $this->container->get('client');
+
+        try {
+            $client->get()->request(trim($m3u8Url));
+
+            if ($client->getBodySize() > self::DOWNLOAD_FILE_MAX) {
+                // 初始化变量
+                $tsBindMap = [];
+                $splQueue = new \SplQueue();
+
+                $m3u8File = new M3u8File();
+                $this->m3u8Files[$index] = $m3u8File;
+
+                // 下载的内容数据
+                $data = $client->getBody();
+
+                // Get ts list from M3U8 file.
+                if ($tsUrls = $this->readTSFileUrls($data)) {
+                    $splArray = new \SplFixedArray(count($tsUrls));
+                    foreach ($tsUrls as $id => $ts) {
+                        // 完整ts地址
+                        $fromTsFile = trim($ts) . '.ts';
+                        $tsUrl = $this->parsedTsUrl($m3u8Url, $fromTsFile);
+                        $splQueue->add($id, $tsUrl);
+                        $basename = basename($tsUrl);
+                        $tsBindMap[$basename] = $tsUrl;
+                        $splArray[$id] = $basename;
+                    }
+
+                    // M3u8File Object.
+                    $m3u8File->setAuthKey($authKey = $this->authKey($data));
+                    $m3u8File->setSplQueue($splQueue);
+                    $m3u8File->setGroupId($this->movieParserClass);
+                    $m3u8File->setOutput($this->getOutputDir());
+                    $m3u8File->setM3u8Id($index);
+                    $m3u8File->setTsCount($splQueue->count());
+                    $m3u8File->setChannel(new \Swoole\Coroutine\Channel($this->getConcurrentNumber()));
+                    $m3u8File->setMergedTsArray($splArray);
+                    $m3u8File->setConcurrent($this->getConcurrentNumber());
+                    $m3u8File->setBindTsMap($tsBindMap);
+                    $m3u8File->setM3u8UrlData($data);
+                    $m3u8File->setDecryptMiddleware($this->decryptMiddleware);
+                    // add progressbar:1
+                    $progressBar->advance();
+                }
+            }
+        } catch (RetryRequestException $e) {
+            $this->container->get('log')->record($e);
+        }
     }
 
     /**
      * @param $data
      * @return array
      */
-    protected function readTSFileUrls($data) : array
+    protected function readTSFileUrls($data): array
     {
         preg_match_all("#,\s(.*?)\.ts#is", $data, $matches);
-        return $matches[1]  ?? [];
+        return $matches[1] ?? [];
     }
 
     private function getConcurrentNumber()
