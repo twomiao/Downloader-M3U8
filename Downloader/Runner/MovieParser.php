@@ -102,10 +102,6 @@ abstract class MovieParser
                 $wg,
                 $m3u8Url,
                 $progressBar,
-                $index,
-                $wg,
-                $m3u8Url,
-                $progressBar,
                 $index
             );
         }
@@ -117,7 +113,7 @@ abstract class MovieParser
         return $this->m3u8Files;
     }
 
-    public function m3u8Object(WaitGroup $wg, $m3u8Url, Manager $progressBar, $index, $wg, $m3u8Url, $progressBar, $index)
+    public function m3u8Object(WaitGroup $wg, $m3u8Url, Manager $progressBar, $index)
     {
         \Swoole\Coroutine::defer(function () use ($wg, $progressBar) {
             $wg->done();
