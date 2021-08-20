@@ -98,7 +98,7 @@ abstract class MovieParser
             $wg->add();
             Coroutine::create
             (
-                '\\Downloader\\Runner\\MovieParser::m3u8Object',
+                [$this, 'm3u8Object'],
                 $wg,
                 $m3u8Url,
                 $progressBar,
