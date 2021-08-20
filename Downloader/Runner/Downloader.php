@@ -347,7 +347,7 @@ class Downloader
         $wg->push(true);
         Coroutine::create
         (
-            '\\Downloader\\Runner\\Downloader::coDownload',
+            [$this, 'coDownload'],
             $progressBar,
             $wg,
             $m3u8File,
