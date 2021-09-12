@@ -1,5 +1,5 @@
 ##### Downloader M3U8：
-<img src="https://img-blog.csdnimg.cn/20210912201957312.png?x-oss-process=image/watermark,type_ZHJvaWRzYW5zZmFsbGJhY2s,shadow_50,text_Q1NETiBAdHdvbWlhbw==,size_20,color_FFFFFF,t_70,g_se,x_16" height="400" alt="正常下载完成"/>
+<img src="https://img-blog.csdnimg.cn/20210912201957312.png?x-oss-process=image/watermark,type_ZHJvaWRzYW5zZmFsbGJhY2s,shadow_50,text_Q1NETiBAdHdvbWlhbw==,size_20,color_FFFFFF,t_70,g_se,x_16" height="255" width="1200"/>
 <br/>
 
 #### M3U8简介：
