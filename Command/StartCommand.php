@@ -25,8 +25,7 @@ class StartCommand extends Command
 
         $task_list = array(
             Hua::class => [
-//                'https://video.com/m3u8/3278/m3u8.m3u8',
-//                'https://video.com/m3u8/3342/m3u8.m3u8'
+            
             ],
 //            YouKu::class => [
 //                'https://video.com/m3u8/3278/m3u8.m3u8',

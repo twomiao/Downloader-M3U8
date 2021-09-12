@@ -280,18 +280,19 @@ class Downloader
                      * @var PartTs $fileTs
                      */
                     foreach ($m3u8Files as $filename => $m3u8File) {
-                        if ($count === FileM3u8::$m3utFileCount) {
-                            Timer::clear($timerId);
-                            return;
+                        if (!$m3u8File->exists()) {
+                            // 下载是否已经完成，开始写入文件
+                            static::$m3u8Statistics[$filename] = static::$m3u8Statistics[$filename] ?? 0;
+                            if ($m3u8File->tsCount() == static::$m3u8Statistics[$filename]) {
+                                $m3u8File->putFile();
+                            }
+                        } else {
+                            $count++;
                         }
 
-                        if ($m3u8File->exists()) {
-                            $count++;
-                            continue;
-                        }
-                        $m3u8Statistics = static::$m3u8Statistics[$filename] ?? 0;
-                        if (($m3u8File->tsCount() == $m3u8Statistics)) {
-                            $m3u8File->putFile();
+                        if ($count == FileM3u8::$m3utFileCount) {
+                            Timer::clear($timerId);
+                            return;
                         }
                     }
                 }
