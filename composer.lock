@@ -4,58 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "55338e0a3c3de6e5c299dff6ae841fbc",
+    "content-hash": "26add62933097a3779456e330d69be51",
     "packages": [
-        {
-            "name": "guiguiboy/php-cli-progress-bar",
-            "version": "0.0.4",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/guiguiboy/PHP-CLI-Progress-Bar.git",
-                "reference": "7d3eb61c1f0c164b9c3139af694b2d38171e4d04"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/guiguiboy/PHP-CLI-Progress-Bar/zipball/7d3eb61c1f0c164b9c3139af694b2d38171e4d04",
-                "reference": "7d3eb61c1f0c164b9c3139af694b2d38171e4d04",
-                "shasum": "",
-                "mirrors": [
-                    {
-                        "url": "https://mirrors.aliyun.com/composer/dists/%package%/%reference%.%type%",
-                        "preferred": true
-                    }
-                ]
-            },
-            "require": {
-                "ext-mbstring": "*",
-                "php": ">=5.3.0"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-0": {
-                    "ProgressBar": "."
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Guillaume",
-                    "email": "guillaume.bretou@gmail.com"
-                }
-            ],
-            "description": "Progress bar for PHP CLI scripts",
-            "homepage": "https://github.com/guiguiboy/PHP-CLI-Progress-Bar",
-            "keywords": [
-                "bar",
-                "cli",
-                "command-line",
-                "progress"
-            ],
-            "time": "2014-11-19T13:12:00+00:00"
-        },
         {
             "name": "katzgrau/klogger",
             "version": "1.2.1",
@@ -111,65 +61,6 @@
                 "logging"
             ],
             "time": "2016-11-07T19:29:14+00:00"
-        },
-        {
-            "name": "league/pipeline",
-            "version": "1.0.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/thephpleague/pipeline.git",
-                "reference": "aa14b0e3133121f8be39e9a3b6ddd011fc5bb9a8"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/thephpleague/pipeline/zipball/aa14b0e3133121f8be39e9a3b6ddd011fc5bb9a8",
-                "reference": "aa14b0e3133121f8be39e9a3b6ddd011fc5bb9a8",
-                "shasum": "",
-                "mirrors": [
-                    {
-                        "url": "https://mirrors.aliyun.com/composer/dists/%package%/%reference%.%type%",
-                        "preferred": true
-                    }
-                ]
-            },
-            "require": {
-                "php": ">=7.1"
-            },
-            "require-dev": {
-                "leanphp/phpspec-code-coverage": "^4.2",
-                "phpspec/phpspec": "^4.3"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "League\\Pipeline\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Frank de Jonge",
-                    "email": "info@frenky.net",
-                    "role": "Author"
-                },
-                {
-                    "name": "Woody Gilk",
-                    "email": "woody.gilk@gmail.com",
-                    "role": "Maintainer"
-                }
-            ],
-            "description": "A plug and play pipeline implementation.",
-            "keywords": [
-                "composition",
-                "design pattern",
-                "pattern",
-                "pipeline",
-                "sequential"
-            ],
-            "time": "2018-06-05T21:06:51+00:00"
         },
         {
             "name": "pimple/pimple",
@@ -1117,8 +1008,9 @@
     "platform": {
         "ext-swoole": ">=4.0.0",
         "ext-curl": "*",
-        "php": ">=7.1.0"
+        "ext-openssl": "*",
+        "php": ">=7.4.0"
     },
     "platform-dev": [],
-    "plugin-api-version": "1.1.0"
+    "plugin-api-version": "2.0.0"
 }

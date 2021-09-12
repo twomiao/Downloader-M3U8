@@ -1,12 +1,11 @@
 {
-  "name": "m3u8/downloader",
-  "type": "package",
-  "description": "通过Swoole协程实现并发，专用于下载M3U8视频",
+  "name": "Downloader",
+  "type": "project",
+  "description": "PHP 协程池超速下载M3U8视频",
   "license": "MIT",
   "keywords": [
     "m3u8",
     "swoole",
-    "php",
     "download"
   ],
   "authors": [
@@ -18,16 +17,15 @@
   "require": {
     "ext-swoole": ">=4.0.0",
     "ext-curl": "*",
+    "ext-openssl": "*",
     "katzgrau/klogger": "^1.2",
-    "guiguiboy/php-cli-progress-bar": "^0.0.4",
-    "php": ">=7.1.0",
+    "php": ">=7.4.0",
     "symfony/console": "^5.2",
-    "pimple/pimple": "^3.3",
-    "league/pipeline": "^1.0"
+    "pimple/pimple": "^3.3"
   },
   "autoload": {
     "psr-4": {
-      "Downloader\\": "Downloader/"
+      "Downloader\\": "./"
     },
     "files": [
     ]

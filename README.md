@@ -1,7 +1,7 @@
 ##### Downloader M3U8：
-<img src="https://img-blog.csdnimg.cn/20210410215311207.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L20wXzM3MDgyOTYy,size_16,color_FFFFFF,t_70" width="650" height="400" alt="正常下载完成"/>
+<img src="https://img-blog.csdnimg.cn/20210912173312138.png?x-oss-process=image/watermark,type_ZHJvaWRzYW5zZmFsbGJhY2s,shadow_50,text_Q1NETiBAdHdvbWlhbw==,size_20,color_FFFFFF,t_70,g_se,x_16" width="650" height="400" alt="正常下载完成"/>
 <br/>
-<img src="https://img-blog.csdnimg.cn/20210410215540283.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L20wXzM3MDgyOTYy,size_16,color_FFFFFF,t_70" width="650" height="400" alt="网络问题，下载失败"/>
+<img src="https://img-blog.csdnimg.cn/20210912173727149.png?x-oss-process=image/watermark,type_ZHJvaWRzYW5zZmFsbGJhY2s,shadow_50,text_Q1NETiBAdHdvbWlhbw==,size_20,color_FFFFFF,t_70,g_se,x_16" width="650" height="400" alt="下载出错，错误日志"/>
 
 #### M3U8简介：
 > m3u8准确来说是一种索引文件，使用m3u8文件实际上是通过它来解析对应的放在服务器上的视频网络地址，从而实现在线播放。使用m3u8格式文件主要因为可以实现多码率视频的适配，视频网站可以根据用户的网络带宽情况，自动为客户端匹配一个合适的码率文件进行播放，从而保证视频的流畅度。
@@ -19,8 +19,8 @@
   
 ### 环境要求
 
-* PHP
-* Swoole
+* PHP 7.4
+* Swoole 4
 
 ### Doc
 
@@ -34,115 +34,92 @@
 Downloader M3U8目录结构：
 ```
 |-- Downloader-M3U8
-    |-- Downloader 
-        |-- Runner  库代码 
-        |-- Command  自定义命令 
-        |-- Parsers 解析ts规则
-            |-- M1905.php -> www.1905.com
-            |-- ..... 更多脚本文件
-            |-- ..... 更多脚本文件
+    |-- Runner  Downloader-M3U8 实现代码 
+    |-- Command  启动命令 
+    |-- Parsers 存放解析规则类
+        |-- M1905.php -> www.1905.com
+        |-- ..... 更多脚本文件
+        |-- ..... 更多脚本文件
     |-- vendor composer autoload 
 ```
 
  启动 Downloader M3U8：
 
 ```
-  $> cd ***/Downloader-M3U8/Downloader
+  $> cd 工作目录
   $> php Downloader.php start
 ```
 
-#### 自定义规则：
+#### 自定义解析规则：
 ```
 <?php
 namespace Downloader\Parsers;
 
-use Downloader\Runner\MovieParser;
+use Downloader\Runner\Parser;
 
-class YouKu extends MovieParser
+class Hua extends Parser
 {
-    /**
-     * @param $m3u8Url string 视频文件信息
-     * @param $movieTs  string ts文件名称
-     * @return string  返回完整ts视频地址
-     */
-    protected function parsedTsUrl(string $m3u8Url, string $movieTs): string
+    static function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
     {
-        $url = str_replace("index.m3u8", "", $m3u8Url);
-
-        return "{$url}{$movieTs}";
-    }
-}
-```
-#### 解密视频：
-```
-<?php
-
-namespace Downloader\Runner\Middleware;
-
-use Downloader\Runner\HttpClient;
-use Downloader\Runner\Middleware\Data\Mu38Data;
-use League\Pipeline\StageInterface;
-
-/**
- * 解密AES 视频
- * Class AesDecryptMiddleware
- * @package Downloader\Runner\Middleware
- */
-class AesDecryptMiddleware implements StageInterface
-{
-    /**
-     * @param Mu38Data $data
-     * @return mixed
-     */
-    public function __invoke($data)
-    {
-        return $this->decrypt($data->getAuthkeyUrl(), $data->getRawData());
+        return dirname($m3u8FileUrl) . '/' . $partTsUrl;
     }
 
-    protected function decrypt($authKeyUrl, $rawData)
+    static function fileName(string $m3u8FileUrl): string
     {
-        [$authKey, $authMethod] = $this->parseKey($authKeyUrl);
-        $data = openssl_decrypt($rawData, $authMethod, $authKey, OPENSSL_RAW_DATA);
+        return basename(dirname($m3u8FileUrl, 1));
+    }  
+
+    /**
+     * 默认解密当前视频文件
+     * @param string $data
+     * @throws FileException
+     * @return string
+     */
+    public static function decodeData(string $data): string
+    {
+        /**
+         ********************************
+         * 默认解密算法  aes-128-cbc
+         ********************************
+         *
+         * 下载网络数据进行尝试解密   
+         * 不满足需求 可以选择重写此方法
+         *
+         * ******************************
+         */
+        if (FileM3u8::$decryptKey && FileM3u8::$decryptMethod) {
+            $data = \openssl_decrypt($data, FileM3u8::$decryptMethod, FileM3u8::$decryptKey, OPENSSL_RAW_DATA);
+            if ($data === false) {
+                throw new FileException(
+                    // 尝试解密方式和秘钥 [aes-128-cbc] - [3423123ew12312]
+                    sprintf("尝试解密方式和秘钥 [%s] - [%s] 解密失败!", FileM3u8::$decryptMethod, FileM3u8::$decryptKey)
+                );
+            }
+        }
         return $data;
     }
-
-    protected function parseKey($authKeyUrl): ?array
-    {
-        preg_match('@(.*?),URI=\"(.*?)\"@Ui', $authKeyUrl, $res);
-
-        $client = new HttpClient();
-
-        $client->get()->request($res[2]);
-
-        $authKey = $client->getBody();
-
-        $result = array(
-            $authKey,
-            'aes-128-cbc'
-        );
-
-        return $result;
-    }
 }
-
-more ......
 
 ```
 
 #### php Downloader.php start：
 ```
 <?php declare(strict_types=1);
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
 use Swoole\Runtime;
-use Downloader\Runner\Downloader as Downloader;
+use Downloader\Runner\Downloader;
 use Symfony\Component\Console\Application;
 use Downloader\Command\StartCommand;
+use function Swoole\Coroutine\run;
 
-\Swoole\Coroutine::create(function () {
+// 下载根目录
+define('DOWNLOAD_DIR', __DIR__ . '/../Downloader');
+
+run(function () {
     Runtime::enableCoroutine(true, SWOOLE_HOOK_ALL);
 
-    $application = new Application('Downloader-M3u8', Downloader::VERSION);
+    $application = new Application(Downloader::APP_NAME, Downloader::VERSION);
     $application->setAutoExit(false);
 
     $application->add(new StartCommand());
@@ -156,23 +133,19 @@ use Downloader\Command\StartCommand;
 namespace Downloader\Command;
 
 use Downloader\Parsers\Hua;
-use Downloader\Parsers\YouKu;
-use Downloader\Runner\Middleware\AesDecryptMiddleware;
-use Downloader\Runner\Middleware\RsaDecryptMiddleware;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Downloader\Runner\Downloader;
 use Pimple\Container as PimpleContainer;
 use Downloader\Runner\ServiceProvider;
-use Pimple\Psr11\Container as Psr11Container;
 
 class StartCommand extends Command
 {
     protected function configure()
     {
         $this->setName('start')
-            ->setDescription('Download M3U8 network video concurrently.')
+            ->setDescription('PHP 协程池超速下载M3U8视频.')
             ->setHelp('php downloader start');
     }
 
@@ -180,29 +153,23 @@ class StartCommand extends Command
     {
         $container = new PimpleContainer();
         $container->register(new ServiceProvider());
-        $container['config'] = $container->extend('config', function ($config, $c) use ($output, $input) {
-            return [
-                'output' => __DIR__ . '/../../../output/',
-                'concurrent' => 25,
-                'outputConsole' => $output,
-                'inputConsole' => $input
-            ];
-        });
-        $c = new Psr11Container($container);
 
-        $downloader = new Downloader($c, $c->get('config'));
-        $downloader
-            ->setMovieParser(new YouKu(), [
-                "https://m3u8i.vodfile.m1905.com/202101121627/67b3778169a648f8ef1b83f26832470a/movie/2014/07/08/m2014070882MYZ4QYL20IY6US/m2014070882MYZ4QYL20IY6US-535k.m3u8",
-//                "https://youku.com-movie-youku.com/20181028/1275_c4fb695f/1000k/hls/index.m3u8",
-            ], array(
-                new AesDecryptMiddleware,
-                new RsaDecryptMiddleware
-            ))
-            ->setMovieParser(new Hua(), [
-//                "https://m3u8i.vodfile.m1905.com/202011220309/972a4a041420ecca90901d33fa2086ee/movie/2017/06/15/m201706152917FI77DD7VW2PA/AF9889E7AAB81F8C1AE5615AD.m3u8"
-            ])
-            ->start();
+        $task_list = array(
+            Hua::class => [    
+//                'https://video.com/m3u8/3278/m3u8.m3u8',
+//                'https://video.com/m3u8/3342/m3u8.m3u8'
+            ],
+//          YouKu::class => [
+//                'https://video.com/m3u8/3278/m3u8.m3u8',
+//                'https://video.com/m3u8/3342/m3u8.m3u8'
+//           ],
+        );
+
+        $downloader = new Downloader($container, $input, $output);
+        try {
+            $downloader->addParsers($task_list);
+        } catch (\ReflectionException $e) {}
+        $downloader->start();
 
         return Command::SUCCESS;
     }
