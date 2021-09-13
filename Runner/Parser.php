@@ -14,7 +14,7 @@ use Swoole\Coroutine\WaitGroup;
  */
 abstract class Parser
 {
-    // [ [Hua::class => [new M3u8File(), new M3u8File()],... ]
+    // [ [M1905::class => [new M3u8File(), new M3u8File()],... ]
     protected static array $m3u8Files = [];
 
     abstract static function tsUrl(string $m3u8FileUrl, string $partTsUrl): string;
@@ -116,7 +116,7 @@ abstract class Parser
             $m3u8File->addPartTs(static::newPartTs($putFileDir, (float)$playTime, $m3u8FileUrl, $pathTs));
         }
 
-        //[Hua::class =>['文件名称'=>new object(), ....]];
+        //[M1905::class =>['文件名称'=>new object(), ....]];
         static::$m3u8Files[static::class][$m3u8File->getFilename()] = $m3u8File;
     }
 

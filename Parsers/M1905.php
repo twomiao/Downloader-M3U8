@@ -1,10 +1,8 @@
 <?php
-
 namespace Downloader\Parsers;
 
 use Downloader\Runner\Parser;
-
-class Hua extends Parser
+class M1905 extends Parser
 {
     static function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
     {
@@ -13,6 +11,6 @@ class Hua extends Parser
 
     static function fileName(string $m3u8FileUrl): string
     {
-        return basename(dirname($m3u8FileUrl, 1));
+        return basename($m3u8FileUrl, '.m3u8');
     }
 }

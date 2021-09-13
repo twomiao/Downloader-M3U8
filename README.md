@@ -56,7 +56,7 @@ namespace Downloader\Parsers;
 
 use Downloader\Runner\Parser;
 
-class Hua extends Parser
+class M1905 extends Parser
 {
     static function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
     {
@@ -65,8 +65,8 @@ class Hua extends Parser
 
     static function fileName(string $m3u8FileUrl): string
     {
-        return basename(dirname($m3u8FileUrl, 1));
-    }  
+        return basename($m3u8FileUrl);
+    }
 
     /**
      * 默认解密当前视频文件
@@ -129,6 +129,7 @@ run(function () {
 #### StartCommand：
 ```
 <?php
+
 namespace Downloader\Command;
 
 use Downloader\Parsers\Hua;
@@ -154,20 +155,16 @@ class StartCommand extends Command
         $container->register(new ServiceProvider());
 
         $task_list = array(
-            Hua::class => [    
-//                'https://video.com/m3u8/3278/m3u8.m3u8',
-//                'https://video.com/m3u8/3342/m3u8.m3u8'
+            Hua::class => [
+                'https://m3u8i.vodfile.m1905.com/202109140903/899d56c3119d5081e6146596da56f185/movie/2018/12/12/m20181212OX4884YQ8ZK2QNKD/7F1206A0BC6B316CF93E07710.m3u8'
             ],
-//          YouKu::class => [
-//                'https://video.com/m3u8/3278/m3u8.m3u8',
-//                'https://video.com/m3u8/3342/m3u8.m3u8'
-//           ],
         );
 
         $downloader = new Downloader($container, $input, $output);
         try {
             $downloader->addParsers($task_list);
-        } catch (\ReflectionException $e) {}
+        } catch (\ReflectionException $e) {
+        }
         $downloader->start();
 
         return Command::SUCCESS;

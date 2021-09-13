@@ -35,7 +35,7 @@ class Downloader
      * @var array $tasks
      */
     protected static array $parsers = [
-        //   Hua::class => [
+        //   M1905::class => [
         //           'https://video.com/m3u8/3278/m3u8.m3u8',
         //           'https://video.com/m3u8/3342/m3u8.m3u8'
         //      ],
@@ -220,7 +220,7 @@ class Downloader
          * 运行下载任务
          *   Array
          *   (
-         *      [Downloader\Parsers\Hua] => Array
+         *      [Downloader\Parsers\M1905] => Array
          *      (
          *        [0] => https://video.com/m3u8/3278/m3u8.m3u8
          *        [1] => https://video.com/m3u8/3342/m3u8.m3u8

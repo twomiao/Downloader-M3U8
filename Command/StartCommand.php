@@ -1,7 +1,8 @@
 <?php
+
 namespace Downloader\Command;
 
-use Downloader\Parsers\Hua;
+use Downloader\Parsers\M1905;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -24,19 +25,16 @@ class StartCommand extends Command
         $container->register(new ServiceProvider());
 
         $task_list = array(
-            Hua::class => [
-            
+            M1905::class => [
+                'https://m3u8ipay.vodfile.m1905.com/202109140913/9968a16b69438ff5f34cc8d91b372cf5/movie/2018/12/12/m20181212OX4884YQ8ZK2QNKD/91E9F9FABB4F66B358CFF7AA7.m3u8'
             ],
-//            YouKu::class => [
-//                'https://video.com/m3u8/3278/m3u8.m3u8',
-//                'https://video.com/m3u8/3342/m3u8.m3u8'
-//            ],
         );
 
-        $downloader = new Downloader($container, $input, $output);
+        $downloader = new Downloader($container, $input, $output, 45);
         try {
             $downloader->addParsers($task_list);
-        } catch (\ReflectionException $e) {}
+        } catch (\ReflectionException $e) {
+        }
         $downloader->start();
 
         return Command::SUCCESS;
