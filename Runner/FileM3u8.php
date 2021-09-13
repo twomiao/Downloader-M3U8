@@ -83,7 +83,7 @@ class FileM3u8
         $this->statusCode = $respHeader['status_code'];
         $this->etag = $respHeader['etag'] ?? '';
         $this->mimeType = $respHeader['content-type'];
-        $this->bodySize = (int)$respHeader['content-length'] ?? 0;
+        $this->bodySize = (int)($respHeader['content-length'] ?? 0);
         if (isset($respHeader['last-modified'])) {
             $this->lastModified = new \DateTime($respHeader['last-modified']);
         }
