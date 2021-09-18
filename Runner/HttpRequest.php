@@ -179,7 +179,7 @@ class HttpRequest
             public function getHeaders(string $name = '')
             {
                 if ($name) {
-                    return $this->resp_header[$name];
+                    return $this->resp_header[$name] ?? '';
                 }
                 return $this->resp_header;
             }
