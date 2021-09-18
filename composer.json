@@ -1,7 +1,7 @@
 {
-  "name": "Downloader",
+  "name": "downloader-m3u8/downloader",
   "type": "project",
-  "description": "PHP 协程池超速下载M3U8视频",
+  "description": "PHP 协程池极速下载M3U8视频",
   "license": "MIT",
   "keywords": [
     "m3u8",
@@ -26,8 +26,6 @@
   "autoload": {
     "psr-4": {
       "Downloader\\": "./"
-    },
-    "files": [
-    ]
+    }
   }
 }

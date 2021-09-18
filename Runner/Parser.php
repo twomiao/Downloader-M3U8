@@ -62,13 +62,14 @@ abstract class Parser
          * ******************************
          */
         if (FileM3u8::$decryptKey && FileM3u8::$decryptMethod) {
-            $data = \openssl_decrypt($data, FileM3u8::$decryptMethod, FileM3u8::$decryptKey, OPENSSL_RAW_DATA);
-            if ($data === false) {
-                throw new FileException(
-                    // 尝试解密方式和秘钥 [aes-128-cbc] - [3423123ew12312]
-                    sprintf("尝试解密方式和秘钥 [%s] - [%s] 解密失败!", FileM3u8::$decryptMethod, FileM3u8::$decryptKey)
-                );
-            }
+            throw new FindKeyException("Find the key, try to decrypt.");
+//            $data = \openssl_decrypt($data, FileM3u8::$decryptMethod, FileM3u8::$decryptKey, OPENSSL_RAW_DATA);
+//            if ($data === false) {
+//                throw new FileException(
+//                    // 尝试解密方式和秘钥 [aes-128-cbc] - [3423123ew12312]
+//                    sprintf("尝试解密方式和秘钥 [%s] - [%s] 解密失败!", FileM3u8::$decryptMethod, FileM3u8::$decryptKey)
+//                );
+//            }
         }
         return $data;
     }
