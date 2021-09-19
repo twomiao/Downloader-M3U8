@@ -64,13 +64,13 @@ abstract class Parser
     }
 
     /**
-     *
-     *
+     * 发现秘钥KEY，才会调用此解密方法
      * @param string $data
+     * @param string $tsUrl
      * @return string
      * @throws FindKeyException
      */
-    public static function decodeData(string $data): string
+    public static function decodeData(string $data, string $tsUrl): string
     {
 
         /**

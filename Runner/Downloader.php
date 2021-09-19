@@ -443,7 +443,7 @@ class Downloader
          */
         $parserClass = FileM3u8::$parserClass;
         try {
-            $content = $parserClass::decodeData($content);
+            $content = $parserClass::decodeData($content, (string) $fileTs);
         } catch (\Exception $e) {
             static::$container[LoggerInterface::class]->error("{$e->getMessage()}");
             $this->cmd->level('error')->print($e->getMessage());

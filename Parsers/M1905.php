@@ -18,7 +18,7 @@ class M1905 extends Parser
         return basename(dirname($m3u8FileUrl, 3));
     }
 
-    static function decodeData(string $data): string
+    static function decodeData(string $data, string $tsUrl): string
     {
         $data = \openssl_decrypt($data, 'AES-128-CBC', FileM3u8::$decryptKey, OPENSSL_RAW_DATA);
         if ($data === false) {
