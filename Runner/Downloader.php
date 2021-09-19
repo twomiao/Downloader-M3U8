@@ -283,6 +283,7 @@ class Downloader
                         if (!$m3u8File->exists()) {
                             // 下载是否已经完成，开始写入文件
                             static::$m3u8Statistics[$filename] = static::$m3u8Statistics[$filename] ?? 0;
+                            // 5770 // 5738
                             if ($m3u8File->tsCount() == static::$m3u8Statistics[$filename]) {
                                 $m3u8File->putFile();
                             }
@@ -453,13 +454,22 @@ class Downloader
         static::$m3u8Statistics[$filename]++;
     }
 
-    public static function getContainer()
+    /**
+     * @param null $key
+     * @return mixed|Container
+     * @throws \Exception
+     */
+    public static function getContainer($key = null)
     {
         if (empty(static::$container)) {
             throw new \Exception('Container is null.');
         }
 
-        return static::$container;
+        if (empty($key)) {
+            return static::$container;
+        }
+
+        return static::$container[$key];
     }
 
     public static function appName(string $message)

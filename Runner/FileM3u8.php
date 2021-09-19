@@ -46,6 +46,12 @@ class FileM3u8
     protected string $m3u8Url;
 
     /**
+     * 解密密码
+     * @var string $keyPassword
+     */
+    protected string $keyPassword;
+
+    /**
      * 匿名响应对象
      * @var $respHeader
      */
@@ -57,9 +63,10 @@ class FileM3u8
      * @param $fileInfoM3u8 FileInfoM3u8
      * @param string $fileName
      * @param string $suffix
+     * @param string $keyPassword
      * @throws \Exception
      */
-    public function __construct($respHeader, $fileInfoM3u8, string $fileName, string $suffix = 'mp4')
+    public function __construct($respHeader, $fileInfoM3u8, string $keyPassword, string $fileName, string $suffix = 'mp4')
     {
         $this->respHeader = $respHeader;
         static::$m3utFileCount++;
@@ -74,7 +81,7 @@ class FileM3u8
         }
 
         // m3u8
-        $this->key = $fileInfoM3u8->getKey();
+        $this->keyPassword = $keyPassword;
         $this->method = $fileInfoM3u8->getMethodKey() ?: 'aes-128-cbc';
         $this->maxDur = $fileInfoM3u8->getMaxTime();
         $this->playTotalTime = self::getPlayTimes($fileInfoM3u8->getTimes());
@@ -101,7 +108,7 @@ class FileM3u8
      */
     public function getDecryptKey(): string
     {
-        return $this->key;
+        return $this->keyPassword;
     }
 
     /**
