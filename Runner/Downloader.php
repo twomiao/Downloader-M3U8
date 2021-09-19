@@ -59,6 +59,10 @@ class Downloader
 //        '613dcd948b263' => 10,
     ];
 
+    protected static array $keyMap = [
+//        '文件名称' => '秘钥'
+    ];
+
     /**
      * 统计下载结果
      * @var array $statistics
@@ -107,13 +111,13 @@ class Downloader
     private int $poolCount = 0;
 
     /**
-     * ********************************************
+     **************************************
      * 协程池
-     * *************************************
+     **************************************
      *  工作队列     $jobChannel
      *  挂起全部协程  $waitGroup
      *  退出全部协程  $quit
-     * ****************************************
+     **************************************
      */
     private Channel $jobChannel;
     private WaitGroup $waitGroup;
@@ -241,6 +245,7 @@ class Downloader
                     $this->cmd->level('warn')->print(
                         sprintf("开始下载文件[ %s ] %s", $m3u8File->getFilename(), $m3u8File->getM3u8Url())
                     );
+
                     // 初始化 0 用于统计当前文件是否下载成功
                     static::$m3u8Statistics[$filename] = static::$m3u8Statistics[$filename] ?? 0;
                     if ($m3u8File->exists()) {
@@ -248,7 +253,12 @@ class Downloader
                         continue;
                     }
 
-                    FileM3u8::$decryptKey = $m3u8File->getDecryptKey();
+                    // m3u8文件日志记录
+                    self::getContainer(LoggerInterface::class)->debug(
+                        sprintf("====> 开始下载M3U8文件[ %s ] %s <====", $m3u8File->getFilename(), $m3u8File->getM3u8Url())
+                    );
+
+                    // 加密算法
                     FileM3u8::$decryptMethod = $m3u8File->getDecryptMethod();
 
                     /**
@@ -316,7 +326,7 @@ class Downloader
                     $row['file_name'] = $filename;
                     $row['m3u8_url'] = $m3u8File->getM3u8Url();
                     $row['ts_count'] = $m3u8File->tsCount();
-                    $row['play_at'] = $m3u8File->getPlayTime('min') . '分钟';
+                    $row['play_at'] = $m3u8File->getPlayTime();
                     $row['put_dir'] = $m3u8File->getPutFileDir();
                     if (!$m3u8File->exists()) {
                         // 判断文件完整性
@@ -419,8 +429,8 @@ class Downloader
             return;
         }
 
+        $httpRequest = new HttpRequest((string)$fileTs, 'GET', ['CURLOPT_HEADER' => true, 'CURLOPT_NOBODY' => false]);
         do {
-            $httpRequest = new HttpRequest((string)$fileTs, 'GET', ['CURLOPT_HEADER' => true, 'CURLOPT_NOBODY' => false]);
             try {
                 $resp = $httpRequest->send();
             } catch (HttpResponseException $e) {
@@ -429,29 +439,27 @@ class Downloader
                 return;
             }
             $fileSize = (int)$resp->getHeaders('content-length');
+            $statusCode = (int)$resp->getHeaders('status_code');
             $content = $resp->getData();
-        } while ($fileSize != strlen($content));
+        } while ($fileSize != strlen($content) && $statusCode === 200);
 
-        /**
-         * ***************************
-         * 解密TS 内容
-         * ***************************
-         *
-         * @var Parser $parserClass
-         *
-         * ***************************
-         */
-        $parserClass = FileM3u8::$parserClass;
         try {
-            $content = $parserClass::decodeData($content, (string) $fileTs);
+            if ($statusCode === 200) {
+                if ($findDecryptKey = Parser::$decryptKeyMap[$filename]) {
+                    $content = (FileM3u8::$parserClass)::decodeData($content, (string)$fileTs, $findDecryptKey);
+                }
+                $fileTs->putFile($content);
+                // 下载完成
+                static::$m3u8Statistics[$filename]++;
+                return;
+            }
+            throw new \Exception(
+                sprintf("下载失败分片网络地址: %s, 状态码: %d", (string)$fileTs, $statusCode)
+            );
         } catch (\Exception $e) {
-            static::$container[LoggerInterface::class]->error("{$e->getMessage()}");
+            static::$container[LoggerInterface::class]->error($e->getMessage());
             $this->cmd->level('error')->print($e->getMessage());
-            return;
         }
-        $fileTs->putFile($content);
-        // 下载完成
-        static::$m3u8Statistics[$filename]++;
     }
 
     /**

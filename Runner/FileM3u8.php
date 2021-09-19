@@ -31,7 +31,7 @@ class FileM3u8
     protected string $statusCode = '304';
 
     // 播放总时长
-    protected float $playTotalTime;
+    protected float $seconds;
     public array $filesTs = [];
     protected string $filename;
 
@@ -46,12 +46,6 @@ class FileM3u8
     protected string $m3u8Url;
 
     /**
-     * 解密密码
-     * @var string $keyPassword
-     */
-    protected string $keyPassword;
-
-    /**
      * 匿名响应对象
      * @var $respHeader
      */
@@ -63,10 +57,9 @@ class FileM3u8
      * @param $fileInfoM3u8 FileInfoM3u8
      * @param string $fileName
      * @param string $suffix
-     * @param string $keyPassword
      * @throws \Exception
      */
-    public function __construct($respHeader, $fileInfoM3u8, string $keyPassword, string $fileName, string $suffix = 'mp4')
+    public function __construct($respHeader, $fileInfoM3u8, string $fileName, string $suffix = 'mp4')
     {
         $this->respHeader = $respHeader;
         static::$m3utFileCount++;
@@ -81,10 +74,9 @@ class FileM3u8
         }
 
         // m3u8
-        $this->keyPassword = $keyPassword;
         $this->method = $fileInfoM3u8->getMethodKey() ?: 'aes-128-cbc';
         $this->maxDur = $fileInfoM3u8->getMaxTime();
-        $this->playTotalTime = self::getPlayTimes($fileInfoM3u8->getTimes());
+        $this->seconds = self::getPlayTimes($fileInfoM3u8->getTimes());
 
         // resp header
         $this->statusCode = $respHeader['status_code'];
@@ -102,16 +94,6 @@ class FileM3u8
     }
 
     /**
-     * 解密密码
-     *
-     * @return string
-     */
-    public function getDecryptKey(): string
-    {
-        return $this->keyPassword;
-    }
-
-    /**
      * 加密方式
      *
      * @return string
@@ -123,17 +105,12 @@ class FileM3u8
 
     /**
      * @param array $times
-     * @return float|int
+     * @return float
      */
     private static function getPlayTimes(array $times)
     {
-        $totalTime = 0;
-
-        foreach ($times as $time) {
-            $curr = (float)sprintf("%0.2f", $time);
-            $totalTime += $curr;
-        }
-        return $totalTime;
+        $seconds = array_sum($times);
+        return (float)sprintf("%0.2f", $seconds);
     }
 
     public function getFilename(): string
@@ -155,15 +132,18 @@ class FileM3u8
         return \count($this->filesTs);
     }
 
-    public function getPlayTime(string $format = 'seconds')
+    public function getPlayTime()
     {
-        $format = strtoupper($format);
-        switch ($format) {
-            case 'MINUTE':
-            case 'MIN':
-                return sprintf("%0.2f", $this->playTotalTime / 60);
-        }
-        return $this->playTotalTime;
+        $seconds = round($this->seconds, 0);
+        $hour    = intval($seconds / 3600);
+        $min     = intval($seconds % 3600 / 60);
+        $second  = round($seconds % 3600 % 60) ;
+
+        return sprintf("%s:%s:%s",
+            str_pad((string)$hour, 2, '0', STR_PAD_LEFT),
+            str_pad((string)$min, 2, '0', STR_PAD_LEFT),
+            str_pad((string)$second, 2, '0', STR_PAD_LEFT)
+        );
     }
 
     public function getPutFileDir()

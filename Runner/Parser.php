@@ -19,6 +19,15 @@ abstract class Parser
     protected static array $m3u8Files = [];
 
     /**
+     * 保存网络中已知秘钥
+     * @var array $keyMap
+     */
+    public static array $decryptKeyMap = [
+//          '文件名称' => '秘钥',
+//          '文件名称' => '秘钥',
+    ];
+
+    /**
      * 下载TS视频
      * @param string $m3u8FileUrl
      * @param string $partTsUrl
@@ -67,12 +76,12 @@ abstract class Parser
      * 发现秘钥KEY，才会调用此解密方法
      * @param string $data
      * @param string $tsUrl
+     * @param string $decryptKey
      * @return string
      * @throws FindKeyException
      */
-    public static function decodeData(string $data, string $tsUrl): string
+    public static function decodeData(string $data, string $tsUrl, string $decryptKey): string
     {
-
         /**
          ********************************
          * 默认解密算法  aes-128-cbc
@@ -102,7 +111,6 @@ abstract class Parser
         try {
             $resp = $httpRequest->send();
         } catch (\Exception $e) {
-            // TODO::
             echo $e->getMessage() . PHP_EOL;
             return;
         }
@@ -117,10 +125,19 @@ abstract class Parser
                 return;
             }
 
-            // 找到KEY
-            $keyPassword = self::getKeyPassword($m3u8FileUrl, $fileInfo->getKey());
-            $m3u8File = new FileM3u8($resp->getHeaders(), $fileInfo, $keyPassword, $fileName);
+            $m3u8File = new FileM3u8($resp->getHeaders(), $fileInfo, $fileName);
             $m3u8File->addM3u8Url($m3u8FileUrl);
+            // 找到KEY 文件，尝试获取网络已知密码
+            $getKeyPassword = function ($m3u8FileUrl, $key) {
+                $keyPassword = "";
+                if (!empty($key)) {
+                    $keyUrl = static::getKeyUrl($m3u8FileUrl, $key);
+                    $keyPassword = file_get_contents($keyUrl);
+                }
+                return $keyPassword;
+            };
+            static::$decryptKeyMap[$fileName] = $getKeyPassword($m3u8FileUrl, $fileInfo->getKey());
+
         } catch (\Exception $e) {
             Downloader::getContainer(LoggerInterface::class)->error($e->getMessage());
             return;
@@ -135,22 +152,6 @@ abstract class Parser
 
         //[M1905::class =>['文件名称'=>new object(), ....]];
         static::$m3u8Files[static::class][$m3u8File->getFilename()] = $m3u8File;
-    }
-
-    /**
-     * 解析完整KEY
-     * @param $key
-     * @param $m3u8FileUrl
-     * @return string
-     */
-    protected static function getKeyPassword($m3u8FileUrl, $key): string
-    {
-        $keyPassword = "";
-        if (!empty($key)) {
-            $keyUrl = static::getKeyUrl($m3u8FileUrl, $key);
-            $keyPassword = file_get_contents($keyUrl);
-        }
-        return $keyPassword;
     }
 
     /**

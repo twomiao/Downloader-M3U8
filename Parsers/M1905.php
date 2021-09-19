@@ -2,9 +2,11 @@
 
 namespace Downloader\Parsers;
 
+use Downloader\Runner\Downloader;
 use Downloader\Runner\FileException;
 use Downloader\Runner\FileM3u8;
 use Downloader\Runner\Parser;
+use Psr\Log\LoggerInterface;
 
 class M1905 extends Parser
 {
@@ -18,12 +20,15 @@ class M1905 extends Parser
         return basename(dirname($m3u8FileUrl, 3));
     }
 
-    static function decodeData(string $data, string $tsUrl): string
+    static function decodeData(string $data, string $tsUrl, string $decryptKey): string
     {
-        $data = \openssl_decrypt($data, 'AES-128-CBC', FileM3u8::$decryptKey, OPENSSL_RAW_DATA);
+        $data = \openssl_decrypt($data, 'AES-128-CBC', $decryptKey, OPENSSL_RAW_DATA);
         if ($data === false) {
+            Downloader::getContainer(LoggerInterface::class)->error(
+                sprintf("网络地址 %s, 尝试解密方式和秘钥 [%s] - [%s] 解密失败!", $tsUrl, FileM3u8::$decryptMethod, $decryptKey)
+            );
             throw new FileException(
-                sprintf("尝试解密方式和秘钥 [%s] - [%s] 解密失败!", FileM3u8::$decryptMethod, FileM3u8::$decryptKey)
+                sprintf("失败网络地址 %s, 尝试解密方式和秘钥 [%s] - [%s] 解密失败!", $tsUrl, FileM3u8::$decryptMethod, $decryptKey)
             );
         }
         return $data;
