@@ -1,3 +1,4 @@
 /vendor
 .idea
 logs
+/Command/StartCommand.php

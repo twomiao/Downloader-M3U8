@@ -26,7 +26,7 @@ class StartCommand extends Command
 
         $task_list = array(
             M1905::class => [
-                'https://m3u8ipay.vodfile.m1905.com/202109140913/9968a16b69438ff5f34cc8d91b372cf5/movie/2018/12/12/m20181212OX4884YQ8ZK2QNKD/91E9F9FABB4F66B358CFF7AA7.m3u8'
+                'https://dz3vqpme6j4gm.cloudfront.net/20210815/118ppt00018/1000kb/hls/index.m3u8'
             ],
         );
 
