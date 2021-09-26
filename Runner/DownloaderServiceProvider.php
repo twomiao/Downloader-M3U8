@@ -33,10 +33,5 @@ class DownloaderServiceProvider implements ServiceProviderInterface
             $httpRequest = new HttpRequest(['CURLOPT_HEADER' => true, 'CURLOPT_NOBODY' => false]);
             return $httpRequest;
         };
-
-        $container[StageInterface::class] = function () {
-            $pipeline = new Pipeline();
-            return $pipeline;
-        };
     }
 }
