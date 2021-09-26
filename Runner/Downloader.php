@@ -318,14 +318,10 @@ class Downloader
                         $count++;
                     }
 
-                    if ($count == FileM3u8::$m3utFileCount) {
+                    if ($count == FileM3u8::$m3utFileCount || $this->workerQuit) {
                         Timer::clear($timerId);
                         return;
                     }
-                }
-                if ($this->workerQuit) {
-                    Timer::clear($timerId);
-                    return;
                 }
             });
         });
