@@ -51,57 +51,88 @@ Downloader M3U8目录结构：
 
 #### 自定义解析规则：
 ```
-<?php
+<?php declare(strict_types=1);
 namespace Downloader\Parsers;
 
-use Downloader\Runner\Parser;
+use Downloader\Runner\Contracts\DecodeVideoInterface;
+use Downloader\Runner\Downloader;
+use Downloader\Runner\FileException;
+use Downloader\Runner\FileM3u8;
+use Downloader\Runner\VideoParser;
+use Psr\Log\LoggerInterface;
 
-class M1905 extends Parser
+class M1905 extends VideoParser implements DecodeVideoInterface
 {
-    static function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
+    /**
+     * 下载文件命名
+     * @param string $m3u8Url
+     * @return string
+     */
+    protected function filename(string $m3u8Url): string
+    {
+        return basename(dirname($m3u8Url, 3));
+    }
+
+    /**
+     * 获取完整ts 地址
+     * @param string $m3u8FileUrl
+     * @param string $partTsUrl
+     * @return string
+     */
+    public function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
     {
         return dirname($m3u8FileUrl) . '/' . $partTsUrl;
     }
 
-    static function fileName(string $m3u8FileUrl): string
+    /**
+     * 解码视频
+     * @param FileM3u8 $fileM3u8
+     * @param string $data
+     * @param string $remoteTsUrl
+     * @return string
+     * @throws FileException
+     */
+    public static function decode(FileM3u8 $fileM3u8, string $data, string $remoteTsUrl): string
     {
-        return basename($m3u8FileUrl);
+        $method = $fileM3u8->getDecryptMethod();
+        $key = $fileM3u8->getKey();
+
+        $data = \openssl_decrypt($data, $method, $key, OPENSSL_RAW_DATA);
+        if ($data === false) {
+            Downloader::getContainer(LoggerInterface::class)->error(
+                sprintf("网络地址 %s, 尝试解密方式和秘钥 [%s] - [%s] 解密失败!", $remoteTsUrl, $method, $key)
+            );
+            throw new FileException(
+                sprintf("失败网络地址 %s, 尝试解密方式和秘钥 [%s] - [%s] 解密失败!", $remoteTsUrl, $method, $key)
+            );
+        }
+        return $data;
     }
 
     /**
-     * 默认解密当前视频文件
-     * @param string $data
-     * @throws FileException
+     * 秘钥KEY
+     * @param FileM3u8 $fileM3u8
      * @return string
      */
-    public static function decodeData(string $data): string
+    public static function key(FileM3u8 $fileM3u8): string
     {
-        /**
-         ********************************
-         * 默认解密算法  aes-128-cbc
-         ********************************
-         *
-         * 下载网络数据进行尝试解密   
-         * 不满足需求 可以选择重写此方法
-         *
-         * ******************************
-         */
-        if (FileM3u8::$decryptKey && FileM3u8::$decryptMethod) {
-            $data = \openssl_decrypt($data, FileM3u8::$decryptMethod, FileM3u8::$decryptKey, OPENSSL_RAW_DATA);
-            if ($data === false) {
-                throw new FileException(
-                    // 尝试解密方式和秘钥 [aes-128-cbc] - [3423123ew12312]
-                    sprintf("尝试解密方式和秘钥 [%s] - [%s] 解密失败!", FileM3u8::$decryptMethod, FileM3u8::$decryptKey)
-                );
-            }
-        }
-        return $data;
+        return file_get_contents(dirname((string)$fileM3u8) . '/' . $fileM3u8->getKeyFile());
+    }
+
+    /**
+     * 加密方式
+     * @param FileM3u8 $fileM3u8
+     * @return string
+     */
+    public static function method(FileM3u8 $fileM3u8): string
+    {
+        return 'aes-128-cbc';
     }
 }
 
 ```
 
-#### php Downloader.php start：
+#### php Downloader.php m1905：
 ```
 <?php declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
@@ -126,47 +157,48 @@ run(function () {
 });
 ```
 
-#### StartCommand：
+#### M1905Command：
 ```
-<?php
-
+<?php declare(strict_types=1);
 namespace Downloader\Command;
 
-use Downloader\Parsers\Hua;
+use Downloader\Parsers\M1905;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Downloader\Runner\Downloader;
 use Pimple\Container as PimpleContainer;
-use Downloader\Runner\ServiceProvider;
+use Downloader\Runner\DownloaderServiceProvider;
 
-class StartCommand extends Command
+class M1905Command extends Command
 {
+    protected PimpleContainer $container;
+
     protected function configure()
     {
-        $this->setName('start')
-            ->setDescription('PHP 协程池超速下载M3U8视频.')
+        $this->setName('m1905')
+            ->addOption('max_workers', 'M', InputArgument::OPTIONAL, '下载任务，使用的协程池数量', 45)
+            ->setDescription('Downloader-M3U8 极速下载程序.')
             ->setHelp('php downloader start');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function initialize(InputInterface $input, OutputInterface $output)
     {
-        $container = new PimpleContainer();
-        $container->register(new ServiceProvider());
+        $this->container = new PimpleContainer();
+        $this->container->register(new DownloaderServiceProvider());
+    }
 
-        $task_list = array(
-            Hua::class => [
-                'https://m3u8i.vodfile.m1905.com/202109140903/899d56c3119d5081e6146596da56f185/movie/2018/12/12/m20181212OX4884YQ8ZK2QNKD/7F1206A0BC6B316CF93E07710.m3u8'
-            ],
-        );
+    protected function execute(InputInterface $io_input, OutputInterface $io_out)
+    {
+        $m3u8s = [
+            // ......... 
+        ];
 
-        $downloader = new Downloader($container, $input, $output);
-        try {
-            $downloader->addParsers($task_list);
-        } catch (\ReflectionException $e) {
-        }
+        $max_workers = (int)$io_input->getOption('max_workers');
+        $downloader = new Downloader($this->container, $io_input, $io_out, $max_workers);
+        $downloader->addParser(new M1905())->addTasks($m3u8s);
         $downloader->start();
-
         return Command::SUCCESS;
     }
 }

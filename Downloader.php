@@ -4,7 +4,7 @@ require __DIR__ . '/vendor/autoload.php';
 use Swoole\Runtime;
 use Downloader\Runner\Downloader;
 use Symfony\Component\Console\Application;
-use Downloader\Command\StartCommand;
+use Downloader\Command\M1905Command;
 use function Swoole\Coroutine\run;
 
 // 下载根目录                                                                                            
@@ -15,7 +15,6 @@ run(function () {
 
     $application = new Application(Downloader::APP_NAME, Downloader::VERSION);
     $application->setAutoExit(false);
-
-    $application->add(new StartCommand());
+    $application->add(new M1905Command());
     $application->run();
 });

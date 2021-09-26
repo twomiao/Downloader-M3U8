@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "26add62933097a3779456e330d69be51",
+    "content-hash": "18af19bdf143bc54c4f2660d3a30eb7c",
     "packages": [
         {
             "name": "katzgrau/klogger",

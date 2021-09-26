@@ -39,7 +39,8 @@ class FileM3u8
     protected string $putFile;
 
     // m3u8 文件结构
-    protected string $key;
+    protected string $keyFile = '';
+    protected string $encryptKey = '';
     protected string $method;
     protected float $maxDur;
     protected string $version;
@@ -74,7 +75,8 @@ class FileM3u8
         }
 
         // m3u8
-        $this->method = $fileInfoM3u8->getMethodKey() ?: 'aes-128-cbc';
+        $this->method = $fileInfoM3u8->getMethodKey();
+        $this->keyFile = $fileInfoM3u8->getKey();
         $this->maxDur = $fileInfoM3u8->getMaxTime();
         $this->seconds = self::getPlayTimes($fileInfoM3u8->getTimes());
 
@@ -88,9 +90,50 @@ class FileM3u8
         }
     }
 
+    /**
+     * key 文件名称
+     * @return string
+     */
+    public function getKeyFile()
+    {
+        return $this->keyFile;
+    }
+
+    /**
+     * 是否加密
+     * @return bool
+     */
+    public function isEncrypt(): bool
+    {
+        return !empty($this->keyFile);
+    }
+
+    /**
+     * 加密KEY
+     * @param string $encryptKey
+     */
+    public function setKey(string $encryptKey): void
+    {
+        $this->encryptKey = $encryptKey;
+    }
+
+    /**
+     * 获取加密KEY
+     * @return string
+     */
+    public function getKey(): string
+    {
+        return $this->encryptKey;
+    }
+
     public function exists(): bool
     {
         return file_exists($this->putFile);
+    }
+
+    public function setEncryptKey(string $encryptKey): void
+    {
+        $this->method = $encryptKey;
     }
 
     /**
@@ -135,9 +178,9 @@ class FileM3u8
     public function getPlayTime()
     {
         $seconds = round($this->seconds, 0);
-        $hour    = intval($seconds / 3600);
-        $min     = intval($seconds % 3600 / 60);
-        $second  = round($seconds % 3600 % 60) ;
+        $hour = intval($seconds / 3600);
+        $min = intval($seconds % 3600 / 60);
+        $second = round($seconds % 3600 % 60);
 
         return sprintf("%s:%s:%s",
             str_pad((string)$hour, 2, '0', STR_PAD_LEFT),

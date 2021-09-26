@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 namespace Downloader\Runner;
 
 class PartTs
@@ -33,12 +34,6 @@ class PartTs
      */
     protected string $tsUrl;
 
-    /**
-     * m3u8File 文件名称
-     * @var string $m3u8Filename
-     */
-    public string $m3u8Filename;
-
     public function __construct(string $putDir, float $playTIme, string $tsUrl)
     {
         $this->tsUrl = $tsUrl;
@@ -46,11 +41,6 @@ class PartTs
         $this->filename = basename($this->tsPath); // ts 文件名称
         $this->putFile = $putDir . '/' . $this->filename;
         $this->playTime = $playTIme;
-    }
-
-    public function setMu38Name(string $filename): void
-    {
-        $this->m3u8Filename = $filename;
     }
 
     /**

@@ -1,7 +1,12 @@
 <?php
 declare(strict_types=1);
+
 namespace Downloader\Runner;
 
+/**
+ * Class FileInfoM3u8
+ * @package Downloader\Runner
+ */
 class FileInfoM3u8
 {
     public static function parser(string $m3u8File)
@@ -14,22 +19,27 @@ class FileInfoM3u8
         {
             private string $dataHeader;
             private string $dataTs;
+            private string $m3u8Data;
 
             public function __construct(string $m3u8Data)
             {
-                if ($this->isM3u8File($m3u8Data)) {
-                    throw new \RuntimeException($m3u8Data, 1002);
+                $this->m3u8Data = $m3u8Data;
+                if (!$this->isM3u8File()) {
+                    throw DownloaderException::valid('Invalid file content');
                 }
-
                 preg_match("@#EXTM3U(.*?)#EXTINF@is", $m3u8Data, $dataHeader);
                 $this->dataHeader = trim($dataHeader[1]);
                 preg_match("@#EXTINF:(.*?)#EXT-X-ENDLIST@is", $m3u8Data, $dataTs);
                 $this->dataTs = trim($dataTs[0]);
             }
 
-            public function isM3u8File(string $m3u8Data): bool
+            public function isM3u8File(): bool
             {
-                return strpos($m3u8Data, '#EXTM3U') === false;
+                $ret = strpos($this->m3u8Data, '#EXTM3U');
+                if (is_int($ret)) {
+                    return true;
+                }
+                return false;
             }
 
             // 加密KEY
