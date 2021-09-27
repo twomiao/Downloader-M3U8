@@ -8,6 +8,13 @@ use Downloader\Runner\FileM3u8;
 use Downloader\Runner\VideoParser;
 use Psr\Log\LoggerInterface;
 
+
+/***
+ * Class M1905
+ * @package Downloader\Parsers
+ * 如果视频本身未加密，不需要实现“解密接口” DecodeVideoInterface
+ * 如果需要登录才能下载，请重写HttpRequest 重新绑定对象到容器即可
+ */
 class M1905 extends VideoParser implements DecodeVideoInterface
 {
     /**
@@ -17,7 +24,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     protected function filename(string $m3u8Url): string
     {
-        return basename(dirname($m3u8Url, 3));
+        return  'demo';
     }
 
     /**
@@ -28,7 +35,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     public function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
     {
-        return dirname($m3u8FileUrl) . '/' . $partTsUrl;
+        return dirname($m3u8FileUrl)."/{$partTsUrl}";
     }
 
     /**

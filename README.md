@@ -1,5 +1,5 @@
 ##### Downloader M3U8：
-<img src="https://img-blog.csdnimg.cn/20210912201957312.png?x-oss-process=image/watermark,type_ZHJvaWRzYW5zZmFsbGJhY2s,shadow_50,text_Q1NETiBAdHdvbWlhbw==,size_20,color_FFFFFF,t_70,g_se,x_16" height="255" width="1200"/>
+<img src="https://img-blog.csdnimg.cn/20210927200332595.png?x-oss-process=image/watermark,type_ZHJvaWRzYW5zZmFsbGJhY2s,shadow_50,text_Q1NETiBAdHdvbWlhbw==,size_20,color_FFFFFF,t_70,g_se,x_16" height="255" width="1200"/>
 <br/>
 
 #### M3U8简介：
@@ -64,6 +64,13 @@ use Downloader\Runner\FileM3u8;
 use Downloader\Runner\VideoParser;
 use Psr\Log\LoggerInterface;
 
+
+/***
+ * Class M1905
+ * @package Downloader\Parsers
+ * 如果视频本身未加密，不需要实现“解密接口” DecodeVideoInterface
+ * 如果需要登录才能下载，请重写HttpRequest 重新绑定对象到容器即可
+ */
 class M1905 extends VideoParser implements DecodeVideoInterface
 {
     /**
@@ -73,7 +80,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     protected function filename(string $m3u8Url): string
     {
-        return basename(dirname($m3u8Url, 3));
+        return  'demo';
     }
 
     /**
@@ -84,7 +91,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     public function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
     {
-        return dirname($m3u8FileUrl) . '/' . $partTsUrl;
+        return dirname($m3u8FileUrl)."/{$partTsUrl}";
     }
 
     /**
@@ -195,7 +202,7 @@ class M1905Command extends Command
     protected function execute(InputInterface $io_input, OutputInterface $io_out)
     {
         $m3u8s = [
-            // ......... 
+             'https://m3u8i.vodfile.m1905.com/202109281135/f5afeb97fafcd00bb70171bec3993e0e/movie/2020/12/14/m20201214WON3NRAK2LTETMBO/234B07C1445F4C1980631D141.m3u8'
         ];
 
         $max_workers = (int)$io_input->getOption('max_workers');

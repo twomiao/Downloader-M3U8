@@ -467,7 +467,10 @@ class Downloader
         for ($i = 1; $i <= $this->poolCount; $i++) {
             $this->waitGroup->add();
             $coroutineId = Coroutine::create(function () {
-                Coroutine::defer(fn () => $this->waitGroup->done());
+                Coroutine::defer(function(){
+                    $this->waitGroup->done();
+                    unset(static::$listCoroutine[Coroutine::getCid()]);
+                });
                 while (1) {
                     /**
                      * @param PartTs|bool
