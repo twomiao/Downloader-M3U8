@@ -8,12 +8,10 @@ use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\WaitGroup;
-use Swoole\Process;
 use Swoole\Timer;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-
 
 class Downloader
 {
@@ -27,16 +25,36 @@ class Downloader
      */
     const APP_NAME = 'Downloader-M3u8';
 
-    /**
-     * @var Container $container
-     */
-    protected static Container $container;
+    // 正在启动
+    const STATE_CURRENT_STARTING = 1;
+
+    // 正在运行
+    const STATE_CURRENT_RUNNING = 2;
+
+    // 退出状态
+    const STATE_CURRENT_QUIT = 3;
+
+    // 暂停完成
+    const STATE_CURRENT_SUSPENDED = 4;
 
     /**
-     * 启动状态
-     * @var bool $runStatus
+     * 暂停中
      */
-    protected static bool $runStatus = false;
+    const STATE_CURRENT_PAUSED = 5;
+
+    /**
+     * 运行状态
+     * @var int $stateCurrent
+     */
+    protected static int $stateCurrent = self::STATE_CURRENT_STARTING;
+
+    /**
+     * @var array $listCoroutine
+     */
+    protected static array $listCoroutine = [
+//        '1' => '运行状态',
+//        '2' => '运行状态'
+    ];
 
     /**
      * 待下载任务
@@ -77,15 +95,18 @@ class Downloader
 //            '播放时长' => '',
 //            '保存位置' => '',
 //        ],
-//        [
-//            '视频名称' => '',
-//            '视频大小' => '',
-//            '片段数量' => '',
-//            '播放时长' => '',
-//            '保存位置' => '',
-//        ]
+        // .....
     ];
 
+    /**
+     * @var Container $container
+     */
+    protected static Container $container;
+
+    /**
+     * 启动时间
+     * @var int $start
+     */
     private int $start;
 
     /**
@@ -133,7 +154,6 @@ class Downloader
     private Channel $jobChannel;
     private WaitGroup $waitGroup;
     private Channel $quit;
-    private bool $workerQuit;
     private Channel $writeFile;
 
     /**
@@ -151,17 +171,16 @@ class Downloader
         $this->writeFile = new Channel();
         $this->output = $output;
         $this->input = $input;
-        $this->workerQuit = false;
         $this->cmd = new Cmd($input, $output, 'INFO');
         $this->poolCount = $poolCount < 1 ? 20 : $poolCount;
-        $this->cmd->env();
         $this->start = time();  // 启动时间
-
         static::$container = $container;
         $this->httpClient = $container[HttpRequestInterface::class];
         $this->logger = $container[LoggerInterface::class];
 
-        Process::signal(SIGINT, [$this, 'workerQuit']);
+        \Swoole\Process::signal(SIGTERM, [$this, 'workerQuit']);
+        \Swoole\Process::signal(SIGINT, [$this, 'workerPauseResume']);
+        $this->cmd->env();
     }
 
     /**
@@ -209,17 +228,17 @@ class Downloader
 
     public function start()
     {
-        if (static::$runStatus === true) {
+        if (static::STATE_CURRENT_RUNNING === static::$stateCurrent) {
             return;
         }
-        static::$runStatus = true;
+        static::$stateCurrent = static::STATE_CURRENT_STARTING;
 
         /**
          * @var $parserObject VideoParser 解析器对象
          * @var $tasks array 视频网络地址
          */
         $parserObject = static::$downloadList['parser'];
-        $taskUrls     = static::$downloadList['tasks'];
+        $taskUrls = static::$downloadList['tasks'];
 
         try {
             $files = $parserObject->load($taskUrls);
@@ -274,7 +293,7 @@ class Downloader
                  * @var PartTs $fileTs
                  */
                 foreach ($m3u8File->filesTs as $fileTs) {
-                    if ($this->workerQuit) {
+                    if (static::$stateCurrent === static::STATE_CURRENT_QUIT) {
                         break;
                     }
                     $this->jobChannel->push([$fileTs, $m3u8File]);
@@ -287,13 +306,75 @@ class Downloader
         $this->statistics();
     }
 
+    /**
+     * **********
+     * SIGTERM
+     * **********
+     * 进程安全退出
+     * **********
+     */
     public function workerQuit()
     {
-        if ($this->workerQuit === false) {
+        if (static::$stateCurrent === static::STATE_CURRENT_RUNNING) {
             $this->quit->push(true);
-            $this->workerQuit = true;
-            $this->logger->debug('===> 按下 ctrl+c 安全退出. <====');
+            static::$stateCurrent = static::STATE_CURRENT_QUIT;
+            $this->logger->debug('===> 平滑停止退出进程. <====');
         }
+    }
+
+    /**
+     * ****************
+     *      Ctrl+c
+     * ****************
+     * 暂停服务或者恢复服务
+     * ****************
+     */
+    public function workerPauseResume()
+    {
+        if (static::$stateCurrent == static::STATE_CURRENT_RUNNING) {
+            static::$stateCurrent = static::STATE_CURRENT_PAUSED;
+            if (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {   // 暂停
+                $this->cmd->print('正在暂停下载进程 ......');
+            }
+        } elseif (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {  // 恢复
+            $this->cmd->print('下载进程正在恢复中 ......');
+            static::$stateCurrent = static::STATE_CURRENT_SUSPENDED;
+            if (static::$stateCurrent == static::STATE_CURRENT_SUSPENDED) {
+                if (static::suspended() === false) {
+                    $this->logger->error('下载进程恢复失败!');
+                    return;
+                }
+                $this->cmd->print('下载进程恢复成功，开始下载!');
+            }
+        }
+    }
+
+    /**
+     * *************
+     * 恢复全部协程运行
+     * *************
+     * @return bool
+     */
+    protected static function suspended(): bool
+    {
+        $success = true;
+        // 恢复状态
+        if (static::$stateCurrent === self::STATE_CURRENT_SUSPENDED) {
+            foreach (static::$listCoroutine as $coroutineId => $current_state) {
+                if ($current_state === self::STATE_CURRENT_PAUSED) {
+                    // 恢复运行状态
+                    static::$listCoroutine[$coroutineId] = static::STATE_CURRENT_RUNNING;
+                    \Swoole\Coroutine::resume($coroutineId);
+                } else {
+                    $success = false;
+                    break;
+                }
+            }
+        }
+        if ($success) {
+            static::$stateCurrent = static::STATE_CURRENT_RUNNING;
+        }
+        return $success;
     }
 
     protected function writeFiles()
@@ -318,7 +399,7 @@ class Downloader
                         $count++;
                     }
 
-                    if ($count == FileM3u8::$m3utFileCount || $this->workerQuit) {
+                    if ($count == FileM3u8::$m3utFileCount || static::$stateCurrent === static::STATE_CURRENT_QUIT) {
                         Timer::clear($timerId);
                         return;
                     }
@@ -378,14 +459,14 @@ class Downloader
         $tableStatistics->render();
 
         $time = (time() - $this->start) / 60;
-        $this->cmd->level('info')->print("全部下载完成用时: " . sprintf("%0.2f %s!", $time, '分钟'));
+        $this->cmd->level('info')->print("下载任务完成，用时: " . sprintf("%0.2f %s!", $time, '分钟'));
     }
 
     protected function workerPool(): void
     {
         for ($i = 1; $i <= $this->poolCount; $i++) {
             $this->waitGroup->add();
-            Coroutine::create(function () {
+            $coroutineId = Coroutine::create(function () {
                 Coroutine::defer(fn () => $this->waitGroup->done());
                 while (1) {
                     /**
@@ -403,8 +484,38 @@ class Downloader
                         $this->cmd->level('debug')->print("开始下载 {$fileTs}.");
                         $this->downloadTsFragment($fileTs, $fileM3u8);
                     }
+
+                    // 暂停服务操作
+                    $this->runPause();
                 }
             });
+            static::$listCoroutine[$coroutineId] = static::STATE_CURRENT_RUNNING;
+        }
+        static::$stateCurrent = static::STATE_CURRENT_RUNNING;
+    }
+
+    /***
+     * *************
+     * 暂停全部协程运行
+     * *************
+     */
+    protected function runPause()
+    {
+        if (static::$stateCurrent == self::STATE_CURRENT_PAUSED) {
+            $cid = \Swoole\Coroutine::getCid();
+            static::$listCoroutine[$cid] = static::STATE_CURRENT_PAUSED;
+            $this->logger->debug('协程ID: [' . $cid . '] 暂停运行成功');
+
+            $count = 0;
+            foreach (static::$listCoroutine as $coroutineId => $current_state) {
+                if ($current_state === self::STATE_CURRENT_PAUSED) {
+                    ++$count;
+                    if ($count == count(static::$listCoroutine)) {
+                        $this->cmd->level('info')->print('已暂停全部下载任务!');
+                    }
+                }
+            }
+            \Swoole\Coroutine::suspend();
         }
     }
 

@@ -14,6 +14,8 @@
    * 支持批量不同视频网站M3U8视频文件下载。
    * 支持自定义不同视频网站规则，重点是解决上面第3点。
    * 协程并发下载，能节省数倍的时间。
+   * Ctrl+C 暂停下载进程 再按Ctrl+C 恢复下载进程。
+   * SIGTERM 信号完成平滑停止下载进程，防止SIGKILL导致数据丢失。
    * Pcntl+MultiCurl 也可以实现。
   
 ### 环境要求
@@ -33,13 +35,14 @@
 Downloader M3U8目录结构：
 ```
 |-- Downloader-M3U8
-    |-- Runner  Downloader-M3U8 实现代码 
-    |-- Command  启动命令 
+    |-- Runner  Downloader-M3U8 核心实现 
+    |-- Command  添加自定义启动命令 
     |-- Parsers 存放解析规则类
         |-- M1905.php -> www.1905.com
         |-- ..... 更多脚本文件
         |-- ..... 更多脚本文件
     |-- vendor composer autoload 
+    |-- Downloader.php 注册启动命令
 ```
 
  启动 Downloader M3U8：
