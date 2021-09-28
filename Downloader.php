@@ -7,7 +7,6 @@ use Symfony\Component\Console\Application;
 use Downloader\Command\M1905Command;
 use function Swoole\Coroutine\run;
 
-// 下载根目录                                                                                            
 define('DOWNLOAD_DIR', __DIR__ . '/../Downloader');
 
 run(function () {

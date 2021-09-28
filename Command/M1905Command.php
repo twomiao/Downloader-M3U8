@@ -18,7 +18,7 @@ class M1905Command extends Command
     protected function configure()
     {
         $this->setName('m1905')
-            ->addOption('max_workers', 'M', InputArgument::OPTIONAL, '下载任务，使用的协程池数量', 45)
+            ->addOption('max_workers', 'M', InputArgument::OPTIONAL, '下载任务，使用的协程池数量', 35)
             ->setDescription('Downloader-M3U8 极速下载程序.')
             ->setHelp('php downloader start');
     }

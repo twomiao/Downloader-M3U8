@@ -35,13 +35,14 @@ class Downloader
     // 退出状态
     const STATE_CURRENT_QUIT = 3;
 
-    // 暂停完成
+    // 恢复状态
     const STATE_CURRENT_SUSPENDED = 4;
 
-    /**
-     * 暂停中
-     */
+    // 暂停状态
     const STATE_CURRENT_PAUSED = 5;
+
+    // 暂停中状态
+    const STATE_CURRENT_HALTED = 6;
 
     /**
      * 运行状态
@@ -334,8 +335,8 @@ class Downloader
     public function workerPauseResume()
     {
         if (static::$stateCurrent == static::STATE_CURRENT_RUNNING) {
-            static::$stateCurrent = static::STATE_CURRENT_PAUSED;
-            if (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {   // 暂停
+            static::$stateCurrent = static::STATE_CURRENT_HALTED;
+            if (static::STATE_CURRENT_HALTED === static::$stateCurrent) {   // 暂停中
                 $this->cmd->print('正在暂停下载进程......');
             }
         } elseif (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {  // 恢复
@@ -507,6 +508,10 @@ class Downloader
     protected function runPause()
     {
         if (static::$stateCurrent == self::STATE_CURRENT_PAUSED) {
+            return;
+        }
+
+        if (static::$stateCurrent == self::STATE_CURRENT_HALTED) {
             $cid = \Swoole\Coroutine::getCid();
             if (static::$listCoroutine[$cid] === static::STATE_CURRENT_RUNNING) {
                 static::$listCoroutine[$cid] = static::STATE_CURRENT_PAUSED;
@@ -517,6 +522,7 @@ class Downloader
             foreach (static::$listCoroutine as $coroutineId => $current_state) {
                 if ($current_state === self::STATE_CURRENT_PAUSED) {
                     if (++$count == count(static::$listCoroutine)) {
+                        static::$stateCurrent = self::STATE_CURRENT_PAUSED;
                         $this->cmd->level('info')->print('已暂停全部下载任务!');
                     }
                 }
