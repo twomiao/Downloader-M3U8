@@ -24,7 +24,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     protected function filename(string $m3u8Url): string
     {
-        return  'demo';
+        return  'demo_'.mt_rand(1,30);
     }
 
     /**

@@ -1,4 +1,5 @@
 <?php declare(strict_types=1);
+
 namespace Downloader\Command;
 
 use Downloader\Parsers\M1905;
@@ -31,7 +32,8 @@ class M1905Command extends Command
     protected function execute(InputInterface $io_input, OutputInterface $io_out)
     {
         $m3u8s = [
-             'https://m3u8i.vodfile.m1905.com/202109281135/f5afeb97fafcd00bb70171bec3993e0e/movie/2020/12/14/m20201214WON3NRAK2LTETMBO/234B07C1445F4C1980631D141.m3u8'
+            'https://m3u8i.vodfile.m1905.com/202109281135/f5afeb97fafcd00bb70171bec3993e0e/movie/2020/12/14/m20201214WON3NRAK2LTETMBO/234B07C1445F4C1980631D141.m3u8',
+            'https://m3u8ipay.vodfile.m1905.com/202109290433/71438d0223ccff3eccd9f3d31c954d05/movie/2018/05/08/m2018050804FPO4ORM7GE0O8S/0210A91CB6860894A1BAA397F.m3u8'
         ];
 
         $max_workers = (int)$io_input->getOption('max_workers');

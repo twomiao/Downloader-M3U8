@@ -1,4 +1,5 @@
 <?php declare(strict_types=1);
+
 namespace Downloader\Runner;
 
 use Downloader\Runner\Contracts\DecodeVideoInterface;
@@ -266,7 +267,7 @@ class Downloader
          * ***********************
          */
         Coroutine::create(function () use ($taskUrls) {
-            Coroutine::defer(fn () => $this->quit->push(true));
+//            Coroutine::defer(fn () => $this->quit->push(true));
 
             /**
              * @var FileM3u8 $m3u8File
@@ -293,6 +294,7 @@ class Downloader
                  * @var PartTs $fileTs
                  */
                 foreach ($m3u8File->filesTs as $fileTs) {
+                    $this->runPause();
                     if (static::$stateCurrent === static::STATE_CURRENT_QUIT) {
                         break;
                     }
@@ -334,10 +336,10 @@ class Downloader
         if (static::$stateCurrent == static::STATE_CURRENT_RUNNING) {
             static::$stateCurrent = static::STATE_CURRENT_PAUSED;
             if (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {   // 暂停
-                $this->cmd->print('正在暂停下载进程 ......');
+                $this->cmd->print('正在暂停下载进程......');
             }
         } elseif (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {  // 恢复
-            $this->cmd->print('下载进程正在恢复中 ......');
+            $this->cmd->print('下载进程正在恢复中......');
             static::$stateCurrent = static::STATE_CURRENT_SUSPENDED;
             if (static::$stateCurrent == static::STATE_CURRENT_SUSPENDED) {
                 if (static::suspended() === false) {
@@ -380,9 +382,9 @@ class Downloader
     protected function writeFiles()
     {
         Coroutine::create(function () {
-            Coroutine::create(fn () => $this->writeFile->pop());
-            $count = 0;
+            Coroutine::defer(fn () => $this->quit->push(true));
             $timerId = Timer::tick(100, function () use (&$timerId, &$count) {
+                $count = 0;
                 /**
                  * @var FileM3u8 $m3u8File
                  * @var PartTs $fileTs
@@ -467,9 +469,9 @@ class Downloader
         for ($i = 1; $i <= $this->poolCount; $i++) {
             $this->waitGroup->add();
             $coroutineId = Coroutine::create(function () {
-                Coroutine::defer(function(){
-                    $this->waitGroup->done();
+                Coroutine::defer(function () {
                     unset(static::$listCoroutine[Coroutine::getCid()]);
+                    $this->waitGroup->done();
                 });
                 while (1) {
                     /**
@@ -506,14 +508,15 @@ class Downloader
     {
         if (static::$stateCurrent == self::STATE_CURRENT_PAUSED) {
             $cid = \Swoole\Coroutine::getCid();
-            static::$listCoroutine[$cid] = static::STATE_CURRENT_PAUSED;
-            $this->logger->debug('协程ID: [' . $cid . '] 暂停运行成功');
+            if (static::$listCoroutine[$cid] === static::STATE_CURRENT_RUNNING) {
+                static::$listCoroutine[$cid] = static::STATE_CURRENT_PAUSED;
+                $this->logger->debug('协程ID: [' . $cid . '] 暂停运行成功');
+            }
 
             $count = 0;
             foreach (static::$listCoroutine as $coroutineId => $current_state) {
                 if ($current_state === self::STATE_CURRENT_PAUSED) {
-                    ++$count;
-                    if ($count == count(static::$listCoroutine)) {
+                    if (++$count == count(static::$listCoroutine)) {
                         $this->cmd->level('info')->print('已暂停全部下载任务!');
                     }
                 }
