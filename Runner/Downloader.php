@@ -337,18 +337,17 @@ class Downloader
         if (static::$stateCurrent == static::STATE_CURRENT_RUNNING) {
             static::$stateCurrent = static::STATE_CURRENT_HALTED;
             if (static::STATE_CURRENT_HALTED === static::$stateCurrent) {   // 暂停中
-                $this->cmd->print('正在暂停下载进程......');
+                $this->cmd->level('warn')->print('正在暂停下载进程......');
             }
         } elseif (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {  // 恢复
-            $this->cmd->print('下载进程正在恢复中......');
+            $this->cmd->level('warn')->print('下载进程正在恢复中......');
             static::$stateCurrent = static::STATE_CURRENT_SUSPENDED;
-            if (static::$stateCurrent == static::STATE_CURRENT_SUSPENDED) {
-                if (static::suspended() === false) {
-                    $this->logger->error('下载进程恢复失败!');
-                    return;
-                }
-                $this->cmd->print('下载进程恢复成功，开始下载!');
+            if (static::suspended() === false) {
+                $this->cmd->level('error')->print('下载进程恢复失败!');
+                $this->logger->error('下载进程恢复失败!');
+                return;
             }
+            $this->cmd->level('info')->print('下载进程恢复成功，开始下载!');
         }
     }
 
