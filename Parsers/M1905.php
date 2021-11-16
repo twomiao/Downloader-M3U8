@@ -2,6 +2,7 @@
 namespace Downloader\Parsers;
 
 use Downloader\Runner\Contracts\DecodeVideoInterface;
+use Downloader\Runner\Contracts\HttpRequestInterface;
 use Downloader\Runner\Downloader;
 use Downloader\Runner\FileException;
 use Downloader\Runner\FileM3u8;
@@ -24,7 +25,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     protected function filename(string $m3u8Url): string
     {
-        return  'demo_'.mt_rand(1,30);
+        return  '往事如烟 (2017)';
     }
 
     /**
@@ -35,7 +36,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     public function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
     {
-        return dirname($m3u8FileUrl)."/{$partTsUrl}";
+        return dirname($m3u8FileUrl).'/'.$partTsUrl;
     }
 
     /**
@@ -44,7 +45,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      * @param string $data
      * @param string $remoteTsUrl
      * @return string
-     * @throws FileException
+     * @throws \Exception
      */
     public static function decode(FileM3u8 $fileM3u8, string $data, string $remoteTsUrl): string
     {
@@ -70,7 +71,7 @@ class M1905 extends VideoParser implements DecodeVideoInterface
      */
     public static function key(FileM3u8 $fileM3u8): string
     {
-        return file_get_contents(dirname((string)$fileM3u8) . '/' . $fileM3u8->getKeyFile());
+        return '1cb465aa9febd998';
     }
 
     /**

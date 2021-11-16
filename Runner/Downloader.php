@@ -394,7 +394,7 @@ class Downloader
                         // 下载是否已经完成，开始写入文件
                         static::$m3u8Statistics[$filename] ??= 0;
                         // 5770 // 5738
-                        if ($m3u8File->tsCount() == static::$m3u8Statistics[$filename]) {
+                        if ($m3u8File->tsCount() === static::$m3u8Statistics[$filename]) {
                             $m3u8File->putFile();
                         }
                     } else {
@@ -428,6 +428,7 @@ class Downloader
                     // 判断文件完整性
                     $number = $m3u8File->tsCount() - static::$m3u8Statistics[$filename];
                     if ($number > 0) {
+                        static::$stateCurrent = static::STATE_CURRENT_QUIT;
                         $download_status = sprintf("失败任务 (%s)", $number);
                     } else {
                         // === 0
@@ -444,6 +445,7 @@ class Downloader
                 $row['download_status'] = $download_status;
 
             } catch (FileException $e) {
+                static::$stateCurrent = static::STATE_CURRENT_QUIT;
                 $row['download_status'] = '失败';
                 $this->cmd->level('warn')->print($e->getMessage());
             }
@@ -575,6 +577,10 @@ class Downloader
             } catch (HttpResponseException $e) {
                 $this->logger->error("发生错误: {$fileTs}");
                 $this->cmd->level('error')->print("发生错误 {$fileTs}.");
+                return;
+            }
+            if(empty($resp))
+            {
                 return;
             }
             $fileSize = (int)$resp->getHeaders('content-length');

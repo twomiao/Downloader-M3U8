@@ -83,7 +83,7 @@ class FileInfoM3u8
             // ts
             public function getPathTs()
             {
-                preg_match_all("@,(.*?).ts@is", $this->dataTs, $matches);
+                preg_match_all("@,(.*?)\.ts@is", $this->dataTs, $matches);
 
                 return ($matches[0]) ?? '';
             }

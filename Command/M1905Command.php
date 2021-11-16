@@ -32,8 +32,7 @@ class M1905Command extends Command
     protected function execute(InputInterface $io_input, OutputInterface $io_out)
     {
         $m3u8s = [
-            'https://m3u8i.vodfile.m1905.com/202109291620/56d27c18db09c845c9baa017512e06b5/movie/2021/02/23/m20210223ABRH3LJ64UX37YDH/FBAFFDC7DA5B968DCEA5E4A62.m3u8',
-            'https://m3u8i.vodfile.m1905.com/202109291620/56d27c18db09c845c9baa017512e06b5/movie/2021/02/23/m20210223ABRH3LJ64UX37YDH/FBAFFDC7DA5B968DCEA5E4A62.m3u8'
+            "https://m3u8i.vodfile.m1905.com/202111170927/b16a2c5c4e703fac95e433708b6dcf21/movie/2021/04/23/m20210423HLB3PMBFY5V7MQJC/5A0D94075EA3985723F544B9E.m3u8"
         ];
 
         $max_workers = (int)$io_input->getOption('max_workers');
