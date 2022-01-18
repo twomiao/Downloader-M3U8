@@ -115,7 +115,7 @@ abstract class VideoParser
         }
 
         // 设置加密
-        if ($m3u8File->isEncrypt() && new static() instanceof DecodeVideoInterface) {
+        if ($m3u8File->isEncrypt() && is_a(static::class, DecodeVideoInterface::class, true)) {
             $key = static::key($m3u8File);
             $keyMethod = static::method($m3u8File);
             $m3u8File->setKey($key);
