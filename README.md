@@ -35,9 +35,9 @@
 Downloader M3U8目录结构：
 ```
 |-- Downloader-M3U8
-    |-- Runner  Downloader-M3U8 核心实现 
+    |-- Runner   Downloader-M3U8 核心实现 
     |-- Command  添加自定义启动命令 
-    |-- Parsers 存放解析规则类
+    |-- Files    文件解析规则
         |-- M1905.php -> www.1905.com
         |-- ..... 更多脚本文件
         |-- ..... 更多脚本文件
@@ -52,95 +52,38 @@ Downloader M3U8目录结构：
   $> php Downloader.php start
 ```
 
-#### 自定义解析规则：
+#### 加密视频代码,额外实现DecryptFileInterface 解密接口：
 ```
 <?php declare(strict_types=1);
-namespace Downloader\Parsers;
+namespace Downloader\Files;
 
-use Downloader\Runner\Contracts\DecodeVideoInterface;
-use Downloader\Runner\Downloader;
-use Downloader\Runner\FileException;
+use Downloader\Runner\Contracts\DecryptFileInterface;
+use Downloader\Runner\Contracts\GenerateUrlInterface;
 use Downloader\Runner\FileM3u8;
-use Downloader\Runner\VideoParser;
-use Psr\Log\LoggerInterface;
+use Downloader\Runner\TransportStreamFile;
 
-
-/***
- * Class M1905
- * @package Downloader\Parsers
- * 如果视频本身未加密，不需要实现“解密接口” DecodeVideoInterface
- * 如果需要登录才能下载，请重写HttpRequest 重新绑定对象到容器即可
+/**
+ * 加密视频必须实现 DecryptFileInterface 解密接口
+ * 未加密视频，只需实现 GenerateUrlInterface 接口
+ * @final
+ * Class TestFile
+ * @package Downloader\Files
  */
-class M1905 extends VideoParser implements DecodeVideoInterface
+final class TestFile extends FileM3u8 implements GenerateUrlInterface,DecryptFileInterface
 {
-    /**
-     * 下载文件命名
-     * @param string $m3u8Url
-     * @return string
-     */
-    protected function filename(string $m3u8Url): string
+    public static function generateUrl(TransportStreamFile $file): string
     {
-        return  'demo_'.mt_rand(1,30);
+       // return 'https://cdn.com/'.trim($file->getUrl());
+       $url = $file->getFileM3u8()->getUrl();
+
+       return dirname($url).'/'.trim($file->getUrl());
     }
 
-    /**
-     * 获取完整ts 地址
-     * @param string $m3u8FileUrl
-     * @param string $partTsUrl
-     * @return string
-     */
-    public function tsUrl(string $m3u8FileUrl, string $partTsUrl): string
+    public function decrypt(string $fileData, FileM3u8 $fileM3u8): string
     {
-        return dirname($m3u8FileUrl)."/{$partTsUrl}";
-    }
-
-    /**
-     * 解码视频
-     * @param FileM3u8 $fileM3u8
-     * @param string $data
-     * @param string $remoteTsUrl
-     * @return string
-     * @throws FileException
-     */
-    public static function decode(FileM3u8 $fileM3u8, string $data, string $remoteTsUrl): string
-    {
-        $method = $fileM3u8->getDecryptMethod();
-        $key = $fileM3u8->getKey();
-
-        $data = \openssl_decrypt($data, $method, $key, OPENSSL_RAW_DATA);
-        if ($data === false) {
-            Downloader::getContainer(LoggerInterface::class)->error(
-                sprintf("网络地址 %s, 尝试解密方式和秘钥 [%s] - [%s] 解密失败!", $remoteTsUrl, $method, $key)
-            );
-            throw new FileException(
-                sprintf("失败网络地址 %s, 尝试解密方式和秘钥 [%s] - [%s] 解密失败!", $remoteTsUrl, $method, $key)
-            );
-        }
-        return $data;
-    }
-
-    /**
-     * 秘钥KEY
-     * @param FileM3u8 $fileM3u8
-     * @return string
-     */
-    public static function key(FileM3u8 $fileM3u8): string
-    {
-        return file_get_contents(dirname((string)$fileM3u8) . '/' . $fileM3u8->getKeyFile());
-    }
-
-    /**
-     * 加密方式
-     * @param FileM3u8 $fileM3u8
-     * @return string
-     */
-    public static function method(FileM3u8 $fileM3u8): string
-    {
-        return 'aes-128-cbc';
+        return openssl_decrypt($fileData, 'aes-128-cbc', '0547f389e9d8babb', OPENSSL_RAW_DATA);
     }
 }
-
-```
 
 #### php Downloader.php m1905：
 ```
@@ -150,19 +93,19 @@ require __DIR__ . '/vendor/autoload.php';
 use Swoole\Runtime;
 use Downloader\Runner\Downloader;
 use Symfony\Component\Console\Application;
-use Downloader\Command\StartCommand;
+use Downloader\Command\M1905Command;
 use function Swoole\Coroutine\run;
 
-// 下载根目录
 define('DOWNLOAD_DIR', __DIR__ . '/../Downloader');
 
 run(function () {
     Runtime::enableCoroutine(true, SWOOLE_HOOK_ALL);
 
-    $application = new Application(Downloader::APP_NAME, Downloader::VERSION);
+    $application = new Application(Downloader::PROGRAM_NAME, Downloader::VERSION);
     $application->setAutoExit(false);
+    $application->add(new M1905Command()); // 下载 https://www.1905.com/ 视频
+//    $application->add(new OtherCommand()); // 其它网站视频
 
-    $application->add(new StartCommand());
     $application->run();
 });
 ```
@@ -173,7 +116,7 @@ run(function () {
 
 namespace Downloader\Command;
 
-use Downloader\Parsers\M1905;
+use Downloader\Files\M1905File;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -182,6 +125,10 @@ use Downloader\Runner\Downloader;
 use Pimple\Container as PimpleContainer;
 use Downloader\Runner\DownloaderServiceProvider;
 
+/**
+ * Class M1905Command
+ * @package Downloader\Command
+ */
 class M1905Command extends Command
 {
     protected PimpleContainer $container;
@@ -189,9 +136,9 @@ class M1905Command extends Command
     protected function configure()
     {
         $this->setName('m1905')
-            ->addOption('max_workers', 'M', InputArgument::OPTIONAL, '下载任务，使用的协程池数量', 45)
-            ->setDescription('Downloader-M3U8 极速下载程序.')
-            ->setHelp('php downloader start');
+            ->addOption('max_workers', 'M', InputArgument::OPTIONAL, '下载任务，使用的协程池数量', 35)
+            ->setDescription('Downloader-M3U8 并发下载程序.')
+            ->setHelp('php Downloader.php [Command] -M [workers]');
     }
 
     protected function initialize(InputInterface $input, OutputInterface $output)
@@ -200,16 +147,38 @@ class M1905Command extends Command
         $this->container->register(new DownloaderServiceProvider());
     }
 
-    protected function execute(InputInterface $io_input, OutputInterface $io_out)
+    protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $m3u8s = [
-            'https://m3u8i.vodfile.m1905.com/202109281135/f5afeb97fafcd00bb70171bec3993e0e/movie/2020/12/14/m20201214WON3NRAK2LTETMBO/234B07C1445F4C1980631D141.m3u8',
-            'https://m3u8ipay.vodfile.m1905.com/202109290433/71438d0223ccff3eccd9f3d31c954d05/movie/2018/05/08/m2018050804FPO4ORM7GE0O8S/0210A91CB6860894A1BAA397F.m3u8'
+
+        $files = [
+           '黄金大劫案' => "https://m3u8i.vodfile.m1905.com/202204061603/c9b4b805a5148ce77e6a5895ffaf8166/movie/2019/10/22/m201910227KZFWKWLUKB73EXO/10A994B56920FEEAC04EB5799.m3u8"
+//           '无人区' => "https://m3u8i.vodfile.m1905.com/202204021350/0062d1437e77ebde0ceedd6ab7022532/movie/2014/07/08/m2014070882MYZ4QYL20IY6US/m2014070882MYZ4QYL20IY6US.m3u8"
         ];
 
-        $max_workers = (int)$io_input->getOption('max_workers');
-        $downloader = new Downloader($this->container, $io_input, $io_out, $max_workers);
-        $downloader->addParser(new M1905())->addTasks($m3u8s);
+        // 推荐安装 FFMPEG 生成指定视频格式文件
+        // 1. Downloader\Runner\CreateBinaryVideoListener::class 二进制文件格式
+        //    不需要安装任何程序，自动生成二进制文件
+        // 2. Downloader\Runner\CreateFFmpegVideoListener::class 指定生成文件格式
+        //    此监听器必须安装FFMPEG 程序，才可以正常使用 [推荐的方式]
+        // 3. 默认使用 [二进制文件格式] 创建视频文件
+        // 4. 用户自行安装FFMPEG 程序，直接把下面这段注释去掉，自动改为FFMPEG 生成视频文件格式
+//       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);
+
+        $downloader  = new Downloader($this->container, $input, $output);
+        $downloader->setConcurrencyValue(15);
+        $downloader->setQueueValue(30);
+
+        foreach ($files as $name => $url)
+        {
+            try
+            {
+                // 创建视频为mp4格式
+                $file = new M1905File($url, DOWNLOAD_DIR.'/黄金大劫案', $name, 'mp4');
+                $downloader->addFile($file);
+            }catch (\Exception $e) {
+                var_dump($e->getMessage());
+            }
+        }
         $downloader->start();
         return Command::SUCCESS;
     }

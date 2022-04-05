@@ -21,7 +21,9 @@
     "katzgrau/klogger": "^1.2",
     "php": ">=7.4.0",
     "symfony/console": "^5.2",
-    "pimple/pimple": "^3.3"
+    "pimple/pimple": "^3.3",
+    "symfony/event-dispatcher": "^5.4",
+    "dariuszp/cli-progress-bar": "^1.0"
   },
   "autoload": {
     "psr-4": {

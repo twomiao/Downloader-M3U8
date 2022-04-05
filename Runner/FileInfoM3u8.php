@@ -6,10 +6,18 @@ namespace Downloader\Runner;
 /**
  * Class FileInfoM3u8
  * @package Downloader\Runner
+ * @method isM3u8File() bool
+ * @method getMethodKey() string
+ * @method getSecretKey() string
+ * @method getVersion() string
+ * @method getMaxTime() float
+ * @method getTimes() float
+ * @method getPathTs() array
+ * @method getTimeArray() array
  */
 class FileInfoM3u8
 {
-    public static function parser(string $m3u8File)
+    public static function parse(string $m3u8File)
     {
         if (empty($m3u8File)) {
             return null;
@@ -17,78 +25,90 @@ class FileInfoM3u8
 
         return new class ($m3u8File)
         {
-            private string $dataHeader;
-            private string $dataTs;
-            private string $m3u8Data;
+            private string $data;
 
-            public function __construct(string $m3u8Data)
+            /**
+             *  constructor.
+             * @param string $data 文件内容
+             */
+            public function __construct(string $data)
             {
-                $this->m3u8Data = $m3u8Data;
+                $this->data = $data;
                 if (!$this->isM3u8File()) {
-                    throw DownloaderException::valid('Invalid file content');
+                    throw new \InvalidArgumentException('无效M3u8文件内容', 102);
                 }
-                preg_match("@#EXTM3U(.*?)#EXTINF@is", $m3u8Data, $dataHeader);
-                $this->dataHeader = trim($dataHeader[1]);
-                preg_match("@#EXTINF:(.*?)#EXT-X-ENDLIST@is", $m3u8Data, $dataTs);
-                $this->dataTs = trim($dataTs[0]);
             }
 
             public function isM3u8File(): bool
             {
-                $ret = strpos($this->m3u8Data, '#EXTM3U');
-                if (is_int($ret)) {
-                    return true;
-                }
-                return false;
+                return \strpos($this->data, '#EXTM3U') === 0;
             }
 
-            // 加密KEY
-            public function getKey()
+            /**
+             * 加密KEY
+             * @return string
+             */
+            public function getSecretKey() : string
             {
-                preg_match('@URI="(.*?)"@is', $this->dataHeader, $matches);
+                \preg_match('@URI="(.*?)"@is', $this->data, $matches);
 
                 return $matches[1] ?? '';
             }
 
-            // 加密方式
-            public function getMethodKey()
+            /**
+             * 加密算法名称
+             * @return string
+             */
+            public function getMethodKey() : string
             {
-                preg_match('@EXT-X-KEY:METHOD=(.*?),@is', $this->dataHeader, $matches);
+                \preg_match('@EXT-X-KEY:METHOD=(.*?),@is', $this->data, $matches);
 
                 return $matches[1] ?? '';
             }
 
-            // 版本号
-            public function getVersion()
+            /**
+             * 版本号
+             * @return int
+             */
+            public function getVersion() : int
             {
-                preg_match('@#EXT-X-VERSION:(\d+)|(\d+\.\d+)@is', $this->dataHeader, $matches);
-                return $matches[1] ?? 0;
+                \preg_match('/#EXT-X-VERSION:(\d+)/is', $this->data, $res);
+
+                return intval($res[1] ?? 0);
             }
 
-            // 最大时间
-            public function getMaxTime()
+            /**
+             * 最大时间
+             * @return float
+             */
+            public function getMaxTime() : float
             {
-                preg_match('@#EXT-X-TARGETDURATION:(\d+)|(\d+\.\d+)@is', $this->dataHeader, $matches);
-                return (float)$matches[1] ?? 0;
+                \preg_match('/#EXT-X-TARGETDURATION:(\d+)/is', $this->data, $res);
+
+                return \floatval($res[1] ?? 0);
             }
 
-            // 时间
-            public function getTimes()
+            /**
+             * 时间集合数组
+             * @return array
+             */
+            public function getTimeArray() : array
             {
-                preg_match_all("@#EXTINF:(.*?),@is", $this->dataTs, $matches);
+                \preg_match_all("@#EXTINF:(.*?),@is", $this->data, $res);
 
-                return ($matches[1]) ?? '0';
+                return $res[1] ?? [] ;
             }
 
-            // ts
-            public function getPathTs()
+            /**
+             * 获取文件视频片段路径
+             * @return array
+             */
+            public function getPathArray() : array
             {
-                preg_match_all("@,(.*?)\.ts@is", $this->dataTs, $matches);
+                \preg_match_all("/,(.*?\.ts)/is", $this->data, $res);
 
-                return ($matches[0]) ?? '';
+                return ($res[1]) ?? [];
             }
         };
     }
-
-
 }

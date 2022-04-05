@@ -2,10 +2,8 @@
 
 namespace Downloader\Runner;
 
-use Downloader\Runner\Contracts\DecodeVideoInterface;
-use Downloader\Runner\Contracts\HttpRequestInterface;
+use Dariuszp\CliProgressBar;
 use Pimple\Container;
-use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\WaitGroup;
@@ -13,92 +11,35 @@ use Swoole\Timer;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 
+/**
+ * @version 3.0
+ * Class Downloader
+ * @package Downloader\Runner
+ */
 class Downloader
 {
-    /**
-     * 版本号
-     */
-    const VERSION = '2.0.1';
+    // 版本号
+    public const VERSION = '3.0';
 
-    /**
-     * 命令行程序名称
-     */
-    const APP_NAME = 'Downloader-M3u8';
-
-    // 正在启动
-    const STATE_CURRENT_STARTING = 1;
-
-    // 正在运行
-    const STATE_CURRENT_RUNNING = 2;
+    // 命令行程序名称
+    public const PROGRAM_NAME = 'Downloader-M3u8';
 
     // 退出状态
-    const STATE_CURRENT_QUIT = 3;
+    protected const STATE_QUIT = 3;
 
-    // 恢复状态
-    const STATE_CURRENT_SUSPENDED = 4;
+    // 正在运行
+    protected const STATE_RUNNING = 2;
 
-    // 暂停状态
-    const STATE_CURRENT_PAUSED = 5;
-
-    // 暂停中状态
-    const STATE_CURRENT_HALTED = 6;
+    // 正在启动
+    protected const STATE_STARTING = 1;
 
     /**
-     * 运行状态
+     * 当前运行状态
      * @var int $stateCurrent
      */
-    protected static int $stateCurrent = self::STATE_CURRENT_STARTING;
-
-    /**
-     * @var array $listCoroutine
-     */
-    protected static array $listCoroutine = [
-//        '1' => '运行状态',
-//        '2' => '运行状态'
-    ];
-
-    /**
-     * 待下载任务
-     * @var array $tasks
-     */
-    protected static array $downloadList = [
-//        ["parser"]=>
-//            string(24) "Downloader\Parsers\M1905"
-//          ["tasks"]=>
-//          array(4) {
-//            [0]=>
-//            string(71) "https://vvvvv/20210917/SQ9MmzQ8/1000kb/hls/index.m3u8"
-//            [1]=>
-//            string(74) "https://vvvvv/zw0111-1231/GVG-106/1000kb/hls/index.m3u8"
-//          }
-    ];
-
-    /**
-     * 下载完成 M3U8文件
-     * @var array $statistics
-     */
-    protected static array $m3u8Statistics = [
-//        '613dcd948b260' => 10,
-//        '613dcd948b261' => 10,
-//        '613dcd948b262' => 10,
-//        '613dcd948b263' => 10,
-    ];
-
-    /**
-     * 统计下载结果
-     * @var array $statistics
-     */
-    protected static array $statistics = [
-//        [
-//            '视频名称' => '',
-//            '文件大小' => '',
-//            '片段数量' => '',
-//            '播放时长' => '',
-//            '保存位置' => '',
-//        ],
-        // .....
-    ];
+    protected static int $stateCurrent = self::STATE_STARTING;
 
     /**
      * @var Container $container
@@ -106,537 +47,484 @@ class Downloader
     protected static Container $container;
 
     /**
+     * 文件队列
+     * @var array $files
+     */
+    protected array $files = [];
+
+    /**
      * 启动时间
      * @var int $start
      */
-    private int $start;
+    protected int $startUp;
 
     /**
-     *  终端输入
-     * @var InputInterface $input
+     * 超时时间
+     * @var int $timeout
      */
-    protected InputInterface $input;
-
-    /**
-     * 终端输出
-     * @var OutputInterface $output
-     */
-    protected OutputInterface $output;
-
-    /**
-     * @var HttpRequest $httpClient
-     */
-    protected HttpRequest $httpClient;
-    /**
-     * @var LoggerInterface $logger
-     */
-    protected LoggerInterface $logger;
+    protected int $timeout = 240;
 
     /**
      * 命令行输出
-     * @var Cmd $cmd
+     * @var Terminal $cmd
      */
-    private Cmd $cmd;
+    protected Terminal $terminal;
 
-    /**
-     * 工作池大小
-     * @var int $count
-     */
-    private int $poolCount = 0;
-
-    /**
-     **************************************
-     * 协程池
-     **************************************
-     *  工作队列     $jobChannel
-     *  挂起全部协程  $waitGroup
-     *  退出全部协程  $quit
-     **************************************
-     */
-    private Channel $jobChannel;
-    private WaitGroup $waitGroup;
-    private Channel $quit;
-    private Channel $writeFile;
+    /*-----------------------------------------
+     | 协程池
+     | ----------------------------------------
+     | 并发数量     $workerCount
+     | 队列大小     $queueSize
+     | 任务队列     $queueMaxSizeChannel
+     | 挂起全部协程  $waitGroup
+     | 退出全部协程  $quitProgram
+     -----------------------------------------*/
+    public int $queueSize      = 90;
+    protected int $workerCount = 30;
+    protected Channel $queueChannel;
+    protected WaitGroup $waitGroup;
+    protected Channel $quitProgram;
+    protected Channel $writeFile;
+    protected bool $quitProgramValue = false;
 
     /**
      * Downloader constructor.
      * @param Container $container
      * @param InputInterface $input
      * @param OutputInterface $output
-     * @param int $poolCount
      */
-    public function __construct(Container $container, InputInterface $input, OutputInterface $output, int $poolCount = 35)
+    public function __construct(Container $container, InputInterface $input, OutputInterface $output)
     {
-        $this->jobChannel = new Channel($this->poolCount * 5);
+        // 协程数量
+        $this->workerCount = $this->getConcurrencyValue();
+        // 队列任务
+        $this->queueChannel = new Channel($this->getQueueValue());
+        // 退出程序
+        $this->quitProgram = new Channel(1);
+        // 阻塞进程
         $this->waitGroup = new WaitGroup();
-        $this->quit = new Channel();
+
         $this->writeFile = new Channel();
-        $this->output = $output;
-        $this->input = $input;
-        $this->cmd = new Cmd($input, $output, 'INFO');
-        $this->poolCount = $poolCount < 1 ? 20 : $poolCount;
-        $this->start = time();  // 启动时间
+
+        // 命令行输出
+        $this->terminal = new Terminal($input, $output, 'INFO');
+        $this->terminal->message();
+        $this->startUp = time();  // 启动时间
+
         static::$container = $container;
-        $this->httpClient = $container[HttpRequestInterface::class];
-        $this->logger = $container[LoggerInterface::class];
-
-        \Swoole\Process::signal(SIGTERM, [$this, 'workerQuit']);
-        \Swoole\Process::signal(SIGINT, [$this, 'workerPauseResume']);
-        $this->cmd->env();
     }
 
     /**
-     * 添加视频解析器
-     * @param VideoParser $parser
-     * @return $this
+     * 超时时间设置
+     * @param int $timeout
      */
-    public function addParser(VideoParser $parser)
-    {
-        if (isset(static::$downloadList['parser'])) {
-            throw new \InvalidArgumentException('Do not add video parsers repeatedly.');
+    public function setTimeout(int $timeout) : void {
+        // 超时时间超过1小时，
+        if ($timeout < -1 && $timeout > 3600) {
+            $timeout = 120;
         }
-
-        static::$downloadList['parser'] = $parser;
-        return $this;
+        $this->timeout = $timeout;
     }
 
     /**
-     * 添加下载任务
-     * @param array $download_urls
-     * @return $this
+     * 设置最大并发数量
+     * @param int $value
      */
-    public function addTasks(array $download_urls)
+    public function setConcurrencyValue(int $value = 0) : void
     {
-        if (!isset(static::$downloadList['parser'])) {
-            throw new \InvalidArgumentException('No video parser found.');
+        if ($value < 5 || $value > 3000) {
+            $value = 30;
         }
-        static::$downloadList['tasks'] = (static::$downloadList['tasks'] ?? []) + $download_urls;
-        return $this;
+        $this->workerCount = $value;
+    }
+
+    protected function getConcurrencyValue() : int
+    {
+        return $this->workerCount;
     }
 
     /**
-     * 添加下载任务
-     * @param string ...$download_urls
-     * @return $this
+     * 设置队列大小
+     * @param int setQueueValue
      */
-    public function addTask(string ... $download_urls)
+    public function setQueueValue(int $value = 0) : void
     {
-        if (!isset(static::$downloadList['parser'])) {
-            throw new \InvalidArgumentException('No video parser found.');
+        if ($value < 80 || $value > 3000) {
+            $value = $this->workerCount * 4;
         }
-        static::$downloadList['tasks'] = $download_urls + (static::$downloadList['tasks'] ?? []);
-        return $this;
+        $this->queueSize = $value;
+    }
+
+    protected function getQueueValue() : int
+    {
+        return $this->queueSize;
+    }
+
+    /**
+     * 添加多个下载任务
+     * @param array $files
+     */
+    public function addFiles(array $files) : void
+    {
+        $result = [];
+        foreach ($files as $file)
+        {
+            if ($file instanceof FileM3u8)
+            {
+                $result[] = $file;
+            }
+        }
+        $this->files = $result;
+    }
+
+    public function addFile(FileM3u8 $file) : void
+    {
+        $this->files[] = $file;
+    }
+
+    protected function isEmpty($files = null) : bool
+    {
+        if (is_null($files)) {
+            $files =  $this->files;
+        }
+        return empty($files);
+    }
+
+    protected function installSignal()
+    {
+        foreach ([SIGINT] as $sign)
+        {
+            Coroutine::create(function()use($sign) {
+                Coroutine\System::waitSignal($sign);
+                switch ($sign)
+                {
+                    case SIGTERM:
+                        var_dump('SIGTERM');
+                        break;
+                    case SIGINT:
+                        var_dump('SIGINT');
+                        $this->quitProgram->push(true);
+                        break;
+                }
+            });
+        }
+    }
+
+    public function files() : array
+    {
+        return $this->files;
+    }
+
+    /**
+     * @return bool|null
+     */
+    protected function searchDone() : ?bool
+    {
+        // 未发现可下载的任务
+        if ($this->isEmpty()) {
+            return null;
+        }
+
+        foreach ( $this->files() as $file) {
+            if (!$file instanceof FileM3u8) {
+                continue;
+            }
+            $this->waitGroup->add();
+            Coroutine::create(function() use($file) {
+                try {
+                    // 分片文件集合
+                    $files  = $file->transportStreamArray();
+                    // 视频播放时长
+                    $file->setTransportStreamFile($files);
+                    $second = $file->getPlaySecond();
+                    $file->setPlayTime($second);
+                    $file->setState(FileM3u8::STATE_CONTENT_SUCCESS);
+                } catch (\Exception | \Error $e) {
+                    static::$container['logger']->error(__METHOD__.":异常日志:{$e->getMessage()}, 错误代码: {$e->getCode()}.");
+                    // 标记失败任务
+                    $file->setState(FileM3u8::STATE_FAIL);
+                    // 获取资源失败 101: 请求失败  102: 文件内容无效
+                    if ($e->getCode() === 101 || $e->getCode() === 102) {
+                        $file->setMessage($e->getMessage());
+                    }
+                } finally {
+                    $this->waitGroup->done();
+                }
+            });
+        }
+        // 任务下载超时
+        return $this->waitGroup->wait($this->timeout);
+    }
+
+    protected function searchNetworkFile()
+    {
+        // 没有发现任务
+        if (is_null( $done = $this->searchDone() )) {
+            $this->terminal->print("未发现下载任务");
+            return;
+        } elseif (!$done) {
+            // 下载任务全部超时
+            $this->terminal->print("下载任务全部超时失败");
+            return;
+        }
+
+        // 成功数量
+        $all = $success = 0;
+        /**
+         * @var FileM3u8 $file
+         */
+        foreach ($this->files() as $num => $file) {
+            $this->terminal->print(sprintf("[%d] 搜索网络文件完成: 《%s》", $num, $file->getFilename()));
+            $all++;
+            if ($file->getState() === FileM3u8::STATE_CONTENT_SUCCESS) {
+                $success++;
+            }
+        }
+        $this->terminal->print(sprintf("搜索网络文件结束，成功:[%d]个,失败:[%d]个", $success, $all - $success));
     }
 
     public function start()
     {
-        if (static::STATE_CURRENT_RUNNING === static::$stateCurrent) {
-            return;
+        if (self::STATE_RUNNING === self::$stateCurrent) {
+           throw new \RuntimeException('无效启动状态!');
         }
-        static::$stateCurrent = static::STATE_CURRENT_STARTING;
+        // 安装信号处理器
+        $this->installSignal();
+        // 查找网络文件
+        $this->searchNetworkFile();
+        // 写入文件队列，进行下载文件任务
+        $this->makeProducers();
+        // 下载文件队列任务
+        $this->makeWorkerPool();
+        // 绘制进度条
+        $this->drawCliProgressBar();
+        // 管控进程
+        $this->monitorWorkerPool();
+        // 协程挂起
+        $this->waitGroup->wait();
+        // 开启协程加速生成视频
+        $this->createNewFiles();
+        // 统计下载结果
+        $this->downloadResults();
+        // 输出下载时间
+        $this->timeCost();
+    }
 
-        /**
-         * @var $parserObject VideoParser 解析器对象
-         * @var $tasks array 视频网络地址
-         */
-        $parserObject = static::$downloadList['parser'];
-        $taskUrls = static::$downloadList['tasks'];
-
-        try {
-            $files = $parserObject->load($taskUrls);
-            if (empty($files)) {
-                return;
-            }
-        } catch (\Exception $e) {
-            $this->cmd->level('ERROR')->print($e->getMessage());
-            return;
-        }
-        static::$downloadList['tasks'] = $files;
-        $this->cmd->print(sprintf("发现M3U8文件[ %s ]个.", FileM3u8::$m3utFileCount));
-
-        /**
-         * ***********************
-         * 运行下载任务
-         *   Array
-         *   (
-         *      [Downloader\Parsers\M1905] => Array
-         *      (
-         *        [0] => https://video.com/m3u8/3278/m3u8.m3u8
-         *        [1] => https://video.com/m3u8/3342/m3u8.m3u8
-         *      )
-         *   )
-         * ***********************
-         */
-        Coroutine::create(function () use ($taskUrls) {
-//            Coroutine::defer(fn () => $this->quit->push(true));
-
-            /**
-             * @var FileM3u8 $m3u8File
-             */
-            foreach (static::$downloadList['tasks'] as $filename => $m3u8File) {
-                $this->cmd->level('warn')->print(
-                    sprintf("开始下载文件[ %s ] %s", $filename, $m3u8File->getM3u8Url())
-                );
-
-                // 初始化 0 用于统计当前文件是否下载成功
-                static::$m3u8Statistics[$filename] = static::$m3u8Statistics[$filename] ?? 0;
-                if ($m3u8File->exists()) {
-                    $this->cmd->level('warn')->print("本地已存在['{$filename}']此文件!!");
-                    continue;
-                }
-
-                // m3u8文件日志记录
-                self::getContainer(LoggerInterface::class)->debug(
-                    sprintf("====> 开始下载M3U8文件[ %s ] %s <====", $filename, $m3u8File->getM3u8Url())
-                );
-
-                /**
-                 * @var FileM3u8 $m3u8File
-                 * @var PartTs $fileTs
-                 */
-                foreach ($m3u8File->filesTs as $fileTs) {
-                    $this->runPause();
-                    if (static::$stateCurrent === static::STATE_CURRENT_QUIT) {
-                        break;
-                    }
-                    $this->jobChannel->push([$fileTs, $m3u8File]);
-                }
-            }
+    protected function monitorWorkerPool() {
+        Coroutine::create(function() {
+           $this->quitProgramValue = $this->quitProgram->pop();
+           $id = Timer::tick(1000, function()use(&$id) {
+               if ($this->queueChannel->length() > 0) {
+                   return;
+               }
+               Timer::clear($id);
+               $this->queueChannel->close();
+           });
         });
-        $this->workerPool();
-        $this->writeFiles();
-        $this->monitor();
-        $this->statistics();
     }
 
-    /**
-     * **********
-     * SIGTERM
-     * **********
-     * 进程安全退出
-     * **********
-     */
-    public function workerQuit()
+    protected function makeProducers()
     {
-        if (static::$stateCurrent === static::STATE_CURRENT_RUNNING) {
-            $this->quit->push(true);
-            static::$stateCurrent = static::STATE_CURRENT_QUIT;
-            $this->logger->debug('===> 平滑停止退出进程. <====');
-        }
-    }
-
-    /**
-     * ****************
-     *      Ctrl+c
-     * ****************
-     * 暂停服务或者恢复服务
-     * ****************
-     */
-    public function workerPauseResume()
-    {
-        if (static::$stateCurrent == static::STATE_CURRENT_RUNNING) {
-            static::$stateCurrent = static::STATE_CURRENT_HALTED;
-            if (static::STATE_CURRENT_HALTED === static::$stateCurrent) {   // 暂停中
-                $this->cmd->level('warn')->print('正在暂停下载进程......');
+        $m3u8Files = $this->files();
+        /**
+         * @var FileM3u8 $m3u8File
+         */
+        foreach ($m3u8Files as $m3u8File)
+        {
+            if ($m3u8File->exists()) {
+                $m3u8File->setState(FileM3u8::STATE_SUCCESS);
+                continue;
             }
-        } elseif (static::STATE_CURRENT_PAUSED === static::$stateCurrent) {  // 恢复
-            $this->cmd->level('warn')->print('下载进程正在恢复中......');
-            static::$stateCurrent = static::STATE_CURRENT_SUSPENDED;
-            if (static::suspended() === false) {
-                $this->cmd->level('error')->print('下载进程恢复失败!');
-                $this->logger->error('下载进程恢复失败!');
-                return;
-            }
-            $this->cmd->level('info')->print('下载进程恢复成功，开始下载!');
-        }
-    }
-
-    /**
-     * *************
-     * 恢复全部协程运行
-     * *************
-     * @return bool
-     */
-    protected static function suspended(): bool
-    {
-        $success = true;
-        // 恢复状态
-        if (static::$stateCurrent === self::STATE_CURRENT_SUSPENDED) {
-            foreach (static::$listCoroutine as $coroutineId => $current_state) {
-                if ($current_state === self::STATE_CURRENT_PAUSED) {
-                    // 恢复运行状态
-                    static::$listCoroutine[$coroutineId] = static::STATE_CURRENT_RUNNING;
-                    \Swoole\Coroutine::resume($coroutineId);
-                } else {
-                    $success = false;
-                    break;
-                }
-            }
-        }
-        if ($success) {
-            static::$stateCurrent = static::STATE_CURRENT_RUNNING;
-        }
-        return $success;
-    }
-
-    protected function writeFiles()
-    {
-        Coroutine::create(function () {
-            Coroutine::defer(fn () => $this->quit->push(true));
-            $timerId = Timer::tick(100, function () use (&$timerId, &$count) {
-                $count = 0;
+            Coroutine::create(function()use($m3u8File) {
                 /**
-                 * @var FileM3u8 $m3u8File
-                 * @var PartTs $fileTs
+                 * @var TransportStreamFile $tsFile
                  */
-                foreach (static::$downloadList['tasks'] as $filename => $m3u8File) {
-                    if (!$m3u8File->exists()) {
-                        // 下载是否已经完成，开始写入文件
-                        static::$m3u8Statistics[$filename] ??= 0;
-                        // 5770 // 5738
-                        if ($m3u8File->tsCount() === static::$m3u8Statistics[$filename]) {
-                            $m3u8File->putFile();
-                        }
-                    } else {
-                        $count++;
+                foreach ($m3u8File as $tsFile) {
+                    if ($tsFile->exists()) {
+                        $m3u8File->setCurrentProgress(1);
+                        continue;
                     }
+                    // 停止写入
+                    if($this->quitProgramValue) {
+                        return;
+                    }
+                    $this->queueChannel->push($tsFile);
+                }
+            });
+        }
+    }
 
-                    if ($count == FileM3u8::$m3utFileCount || static::$stateCurrent === static::STATE_CURRENT_QUIT) {
+    protected function makeWorkerPool()
+    {
+        for ($i = 1; $i <= $this->workerCount; $i++)
+        {
+            $this->waitGroup->add();
+            Coroutine::create(function() {
+                Coroutine::defer(function(){
+                   $this->waitGroup->done();
+                });
+
+                while(true)
+                {
+                    /**
+                     * @var $file TransportStreamFile
+                     */
+                    $file = $this->queueChannel->pop();
+                    if (!$file) {
+                       break;
+                    }
+                    $this->downloadTsFragment($file, 3, 30);
+                }
+            });
+        }
+    }
+
+    protected function downloadTsFragment(TransportStreamFile $transportStreamFile, int $retry, int $timeout) : bool
+    {
+        while($retry-- > 0) {
+            try
+            {
+                if ($data = $transportStreamFile->getBody($timeout)) {
+                    $transportStreamFile->setState(TransportStreamFile::STATE_SUCCESS);
+                    // ts 视频文件大小
+                    $fileSize = $transportStreamFile->saveFile($data);
+                    $fileM3u8 = $transportStreamFile->getFileM3u8();
+                    $fileM3u8->setFileSize($fileSize);
+                    $fileM3u8->setCurrentProgress(1);
+                    return true;
+                }
+                $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
+            } catch (\Exception | \Error $e) {
+                // 下载失败,记录日志
+                $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
+                static::$container['logger']->error(__METHOD__.":异常日志:{$e->getMessage()}, 错误代码: {$e->getCode()}.");
+            }
+        }
+        return false;
+    }
+
+    protected function drawCliProgressBar() {
+        /**
+         * @var $file FileM3u8
+         */
+        foreach ($this->files() as $file) {
+            $this->waitGroup->add();
+            Coroutine::create(function()use($file) {
+                Coroutine::defer(function() {
+                   $this->waitGroup->done();
+                });
+                // 文件总数
+                $length = \count($file);
+                // 绘制命令行进度条
+                $bar = new CliProgressBar($length, 0, "下载中[ {$file->getFilename()} ]: ");
+                $bar->setBarLength(100);
+                $timerId = Timer::tick(1000, function()use(&$timerId, $file, $bar) {
+                    if ($this->quitProgramValue) {
                         Timer::clear($timerId);
                         return;
                     }
-                }
-            });
-        });
-    }
 
-    protected function statistics()
-    {
-        /**
-         * @param FileM3u8 $m3u8File
-         */
-        foreach (static::$downloadList['tasks'] as $filename => $m3u8File) {
-            $fileSize = 0;
-            try {
-                // '视频名称', '网络地址', '片段数量', '播放时长', '保存位置', '文件大小'
-                $row['file_name'] = $filename;
-                $row['m3u8_url'] = $m3u8File->getM3u8Url();
-                $row['ts_count'] = $m3u8File->tsCount();
-                $row['play_at'] = $m3u8File->getPlayTime();
-                $row['put_dir'] = $m3u8File->getPutFileDir();
-                if (!$m3u8File->exists()) {
-                    // 判断文件完整性
-                    $number = $m3u8File->tsCount() - static::$m3u8Statistics[$filename];
-                    if ($number > 0) {
-                        static::$stateCurrent = static::STATE_CURRENT_QUIT;
-                        $download_status = sprintf("失败任务 (%s)", $number);
-                    } else {
-                        // === 0
-                        $m3u8File->putFile();
-                        $fileSize = $m3u8File->getFileSize();
-                        $download_status = '成功';
-                    }
-                } else {
-                    $download_status = '成功';
-                    $fileSize = $m3u8File->getFileSize();
-                }
-
-                $row['file_size'] = $fileSize;
-                $row['download_status'] = $download_status;
-
-            } catch (FileException $e) {
-                static::$stateCurrent = static::STATE_CURRENT_QUIT;
-                $row['download_status'] = '失败';
-                $this->cmd->level('warn')->print($e->getMessage());
-            }
-            static::$statistics[] = $row;
-        }
-
-        //   '视频名称' => '',
-        //   '文件大小' => '',
-        //   '片段数量' => '',
-        //   '播放时长' => '',
-        //   '保存位置' => '',
-        $tableStatistics = new Table($this->output);
-        $tableStatistics->setHeaders(['视频名称', '网络地址', '片段数量', '播放时长', '保存位置', '文件大小', '下载状态']);
-        $tableStatistics->setRows(static::$statistics);
-        $tableStatistics->render();
-
-        $time = (time() - $this->start) / 60;
-        $this->cmd->level('info')->print("下载任务完成，用时: " . sprintf("%0.2f %s!", $time, '分钟'));
-    }
-
-    protected function workerPool(): void
-    {
-        for ($i = 1; $i <= $this->poolCount; $i++) {
-            $this->waitGroup->add();
-            $coroutineId = Coroutine::create(function () {
-                Coroutine::defer(function () {
-                    unset(static::$listCoroutine[Coroutine::getCid()]);
-                    $this->waitGroup->done();
-                });
-                while (1) {
-                    /**
-                     * @param PartTs|bool
-                     * @param FileM3u8 $fileM3u8
-                     */
-                    $data = $this->jobChannel->pop();
-
-                    if ($data === true) {
+                    // 正常进度条统计
+                    $current = $file->getCurrentProgress();
+                    $bar->setCurrentStep($current);
+                    $bar->display();
+                    // 多任务下载可开启
+//                    echo PHP_EOL;
+                    if ($file->count() === $current) {
+                        // 标记视频下载完成
+                        $file->setState(FileM3u8::STATE_SUCCESS);
+                        $this->queueChannel->close();
+                        Timer::clear($timerId);
                         return;
                     }
-
-                    if (is_array($data)) {
-                        [$fileTs, $fileM3u8] = $data;
-                        $this->cmd->level('debug')->print("开始下载 {$fileTs}.");
-                        $this->downloadTsFragment($fileTs, $fileM3u8);
-                    }
-
-                    // 暂停服务操作
-                    $this->runPause();
-                }
+                });
+                $bar->end();
             });
-            static::$listCoroutine[$coroutineId] = static::STATE_CURRENT_RUNNING;
         }
-        static::$stateCurrent = static::STATE_CURRENT_RUNNING;
     }
 
-    /***
-     * *************
-     * 暂停全部协程运行
-     * *************
-     */
-    protected function runPause()
-    {
-        if (static::$stateCurrent == self::STATE_CURRENT_PAUSED) {
+    protected function createNewFiles() {
+        $waitGroup = null;
+        /**
+         * @var $file FileM3u8
+         */
+        foreach ($this->files() as $file) {
+            if ($file->getState() === FileM3u8::STATE_SUCCESS) {
+                if (is_null($waitGroup)) {
+                    $waitGroup = new WaitGroup();
+                }
+                $waitGroup->add();
+                Coroutine::create(function() use($file,$waitGroup){
+                    Coroutine::defer(fn()=>$waitGroup->done());
+                    try
+                    {
+                        /**
+                         * @var $dispatcher EventDispatcher
+                         */
+                        $dispatcher = self::$container['dispatcher'];
+                        // 事件为空，添加默认处理器[二进制]
+                        if (!$dispatcher->hasListeners(CreateVideoFileEvent::NAME)) {
+                            $dispatcher->addListener(CreateVideoFileEvent::NAME, [new CreateBinaryVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);
+                        }
+                        // 视频转换合并
+                        $dispatcher->dispatch(new CreateVideoFileEvent($file), CreateVideoFileEvent::NAME);
+                    } catch (\Exception | \Error $e) {
+                        // 写入日志文件
+                        static::$container['logger']->error(__METHOD__.":异常日志:{$e->getMessage()}, 错误代码: {$e->getCode()}.");
+                    }
+                });
+            }
+        }
+
+        $waitGroup->wait();
+        // 通知消费者退出
+        if ($this->quitProgramValue === false) {
+            $this->quitProgram->push(true);
+        }
+    }
+
+    protected function downloadResults() {
+        $output = $this->terminal->getOutput();
+        if (is_null($output)) {
             return;
         }
-
-        if (static::$stateCurrent == self::STATE_CURRENT_HALTED) {
-            $cid = \Swoole\Coroutine::getCid();
-            if (static::$listCoroutine[$cid] === static::STATE_CURRENT_RUNNING) {
-                static::$listCoroutine[$cid] = static::STATE_CURRENT_PAUSED;
-                $this->logger->debug('协程ID: [' . $cid . '] 暂停运行成功');
-            }
-
-            $count = 0;
-            foreach (static::$listCoroutine as $coroutineId => $current_state) {
-                if ($current_state === self::STATE_CURRENT_PAUSED) {
-                    if (++$count == count(static::$listCoroutine)) {
-                        static::$stateCurrent = self::STATE_CURRENT_PAUSED;
-                        $this->cmd->level('info')->print('已暂停全部下载任务!');
-                    }
-                }
-            }
-            \Swoole\Coroutine::suspend();
+        // 下载结果
+        $result = [];
+        /**
+         * @var $file FileM3u8
+         */
+        foreach ($this->files() as $id => $file) {
+            $info['id']           = ++$id;
+            $info['filename']     = $file->getFilename();
+            $info['count']        = \count($file);
+            $info['now']          = $file->getPlaySecondFormat();
+            $info['save_path']    = $file->getFilePath();
+            $info['filesize']     = $file->getFileSizeFormat();
+            $info['status']       = $file->getStateText();
+            $info['download_url'] = $file->getUrl();
+            $result[] = $info;
         }
+        $fileTable = new Table($output);
+        $fileTable->setHeaders(['ID', '视频名','分片数', '播放时长', '保存位置', '文件大小', '下载状态',  '网络地址']);
+        $fileTable->setRows($result);
+        $fileTable->render();
     }
 
-    protected function monitor(): void
-    {
-        Coroutine::create(function () {
-            $this->quit->pop();
-            $timerId = Timer::tick(100, function () use (&$timerId) {
-                if ($this->jobChannel->length() > 0) {
-                    return;
-                }
-                Timer::clear($timerId);
-
-                while ($this->poolCount--) {
-                    if ($this->jobChannel->push(true) === false) {
-                        break;
-                    }
-                }
-
-                $this->writeFile->push(true);
-                $this->jobChannel->close();
-                $this->writeFile->close();
-            });
-        });
-
-        $this->waitGroup->wait();
-    }
-
-    /**
-     * 下载 TS 帧片段
-     * @param PartTs $fileTs
-     * @param FileM3u8 $fileM3u8
-     */
-    public function downloadTsFragment(PartTs $fileTs, FileM3u8 $fileM3u8)
-    {
-        $filename = $fileM3u8->getFilename();
-        // m3u8 文件名称
-        if ($fileTs->exists()) {
-            static::$m3u8Statistics[$filename]++;
-            return;
+    protected function timeCost() {
+        // 分钟数
+        $timeCost = time() - $this->startUp;
+        $unit     = '秒';
+        if ($timeCost >= 60) {
+            $unit     = '分钟';
+            $timeCost /= 60;
         }
 
-        do {
-            try {
-                $resp = $this->httpClient->send($fileTs->getTsUrl());
-            } catch (HttpResponseException $e) {
-                $this->logger->error("发生错误: {$fileTs}");
-                $this->cmd->level('error')->print("发生错误 {$fileTs}.");
-                return;
-            }
-            if(empty($resp))
-            {
-                return;
-            }
-            $fileSize = (int)$resp->getHeaders('content-length');
-            $statusCode = (int)$resp->getHeaders('status_code');
-            $content = $resp->getData();
-        } while ($fileSize != strlen($content) && $statusCode === 200);
-
-        try {
-            if ($statusCode === 200) {
-                /**
-                 * @var VideoParser $parserObject
-                 */
-                $parserObject = static::$downloadList['parser'];
-                if ($fileM3u8->isEncrypt() && $parserObject instanceof DecodeVideoInterface) {
-                    $content = $parserObject::decode($fileM3u8, $content, $fileTs->getTsUrl());
-                }
-
-                $fileTs->putFile($content);
-                // 下载完成
-                static::$m3u8Statistics[$filename]++;
-                return;
-            }
-            throw new \Exception(
-                sprintf("下载失败分片网络地址: %s, 状态码: %d", (string)$fileTs, $statusCode)
-            );
-        } catch (\Exception $e) {
-            $this->logger->error($e->getMessage());
-            $this->cmd->level('error')->print($e->getMessage());
+        if ($timeCost >= 60) { // 小时
+            $timeCost /= 60;
+            $unit     = '小时';
         }
-    }
-
-    /**
-     * @param null $key
-     * @return mixed|Container
-     * @throws \Exception
-     */
-    public static function getContainer($key = null)
-    {
-        if (empty(static::$container)) {
-            throw new \Exception('Container is null.');
-        }
-
-        if (empty($key)) {
-            return static::$container;
-        }
-
-        return static::$container[$key];
-    }
-
-    public static function appName(string $message)
-    {
-        return self::APP_NAME . ' ' . $message;
-    }
-
-    public static function version()
-    {
-        return self::VERSION;
+        $timeCost   = \sprintf("%0.2f", $timeCost);
+        $fileNumber = \count($this->files());
+        print date('Y-m-d H:i:s'). " >下载用时{$timeCost}{$unit}, 完成({$fileNumber})个任务.\n";
     }
 }

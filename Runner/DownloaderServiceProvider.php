@@ -2,17 +2,13 @@
 declare(strict_types=1);
 namespace Downloader\Runner;
 
-use Downloader\Runner\Contracts\HttpRequestInterface;
 use Katzgrau\KLogger\Logger;
-use League\Pipeline\Pipeline;
-use League\Pipeline\StageInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
-use Psr\Log\LoggerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 
 class DownloaderServiceProvider implements ServiceProviderInterface
 {
-
     /**
      * Registers services on the given container.
      *
@@ -23,15 +19,9 @@ class DownloaderServiceProvider implements ServiceProviderInterface
      */
     public function register(Container $container)
     {
-        $container['log.dir'] = function () {
-            return __DIR__ . '/../logs/';
-        };
-        $container[LoggerInterface::class] = function (Container $container) {
-            return new Logger($container['log.dir']);
-        };
-        $container[HttpRequestInterface::class] = function () {
-            $httpRequest = new HttpRequest(['CURLOPT_HEADER' => true, 'CURLOPT_NOBODY' => false]);
-            return $httpRequest;
-        };
+        // 日志服务
+        $container['logger'] = fn($c) => new Logger(getcwd() . '/logs');
+        // 事件服务
+        $container['dispatcher'] = fn($c) => new EventDispatcher();
     }
 }
