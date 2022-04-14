@@ -103,7 +103,7 @@ class TransportStreamFile
      * @return int
      * @throws \Exception
      */
-    public function saveFile(?string $data = null, bool $overwrite = false) :int
+    public function saveFile(string $data, bool $overwrite = false) :int
     {
         if($this->exists() && !$overwrite) {
            return \filesize($this->filePath);
