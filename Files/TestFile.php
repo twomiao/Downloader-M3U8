@@ -15,11 +15,12 @@ final class TestFile extends FileM3u8 implements GenerateUrlInterface,DecryptFil
 {
     public static function generateUrl(TransportStreamFile $file): string
     {
-        return 'https://cdn.com/'.trim($file->getUrl());
+        $path = $file->getUrl();
+        return "https://xxx.com/{$path}";
     }
 
     public function decrypt(string $fileData, FileM3u8 $fileM3u8): string
     {
-        return openssl_decrypt($fileData, 'aes-128-cbc', '0547f389e9d8babb', OPENSSL_RAW_DATA);
+        return openssl_decrypt($fileData, 'aes-128-cbc', '9d2d4fcf98fb99aa', OPENSSL_RAW_DATA);
     }
 }

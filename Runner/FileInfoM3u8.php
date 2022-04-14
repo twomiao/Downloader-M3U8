@@ -105,7 +105,7 @@ class FileInfoM3u8
              */
             public function getPathArray() : array
             {
-                \preg_match_all("/,(.*?\.ts)/is", $this->data, $res);
+                \preg_match_all("/,[\s](.*?\.ts)/is", $this->data, $res);
 
                 return ($res[1]) ?? [];
             }

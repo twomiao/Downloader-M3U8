@@ -63,8 +63,6 @@ use Downloader\Runner\FileM3u8;
 use Downloader\Runner\TransportStreamFile;
 
 /**
- * 加密视频必须实现 DecryptFileInterface 解密接口
- * 未加密视频，只需实现 GenerateUrlInterface 接口
  * @final
  * Class TestFile
  * @package Downloader\Files
@@ -73,15 +71,13 @@ final class TestFile extends FileM3u8 implements GenerateUrlInterface,DecryptFil
 {
     public static function generateUrl(TransportStreamFile $file): string
     {
-       // return 'https://cdn.com/'.trim($file->getUrl());
-       $url = $file->getFileM3u8()->getUrl();
-
-       return dirname($url).'/'.trim($file->getUrl());
+        $path = $file->getUrl();
+        return "https://xx.com/{$path}";
     }
 
     public function decrypt(string $fileData, FileM3u8 $fileM3u8): string
     {
-        return openssl_decrypt($fileData, 'aes-128-cbc', '0547f389e9d8babb', OPENSSL_RAW_DATA);
+        return openssl_decrypt($fileData, 'aes-128-cbc', '9d2d4fcf98fb99aa', OPENSSL_RAW_DATA);
     }
 }
 ```
