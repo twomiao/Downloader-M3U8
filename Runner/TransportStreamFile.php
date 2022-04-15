@@ -151,6 +151,13 @@ class TransportStreamFile
         return $this->filePath;
     }
 
+    public function getFileSize():int {
+        if($this->exists()) {
+            return \filesize($this->filePath);
+        }
+        return 0;
+    }
+
     public function filename() : string
     {
         return $this->filename;
