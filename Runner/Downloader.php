@@ -515,7 +515,7 @@ class Downloader
             $info['filename']     = $file->getFilename();
             $info['count']        = \count($file);
             $info['now']          = $file->getPlaySecondFormat();
-            $info['save_path']    = $file->getFilePath();
+            $info['save_path']    = \realpath($file->getFilePath());
             $info['filesize']     = $file->getFileSizeFormat();
             $info['status']       = $file->getStateText();
             $info['download_url'] = $file->getUrl();
