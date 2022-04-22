@@ -7,6 +7,7 @@ use Pimple\Container;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\WaitGroup;
+use Swoole\Process;
 use Swoole\Timer;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
@@ -192,22 +193,14 @@ class Downloader
 
     protected function installSignal()
     {
-        foreach ([SIGINT] as $sign)
-        {
-            Coroutine::create(function()use($sign) {
-                Coroutine\System::waitSignal($sign);
-                switch ($sign)
-                {
-                    case SIGTERM:
-                        var_dump('SIGTERM');
-                        break;
-                    case SIGINT:
-                        var_dump('SIGINT');
-                        $this->quitProgram->push(true);
-                        break;
-                }
-            });
-        }
+        $flag = false;
+        Process::signal(SIGINT, function()use(&$flag){
+            if ($flag === false) {
+                $flag = true;
+                $this->quitProgram->push(true);
+                var_dump('SIGINT');
+            }
+        });
     }
 
     public function files() : array
@@ -243,6 +236,7 @@ class Downloader
                     static::$container['logger']->error(__METHOD__.":异常日志:{$e->getMessage()}, 错误代码: {$e->getCode()}.");
                     // 标记失败任务
                     $file->setState(FileM3u8::STATE_FAIL);
+                    $file->cliProgressBar->setColorToRed();
                     // 获取资源失败 101: 请求失败  102: 文件内容无效
                     if ($e->getCode() === 101 || $e->getCode() === 102) {
                         $file->setMessage($e->getMessage());
@@ -317,6 +311,7 @@ class Downloader
                }
                Timer::clear($id);
                $this->queueChannel->close();
+               $this->quitProgram->close();
            });
         });
     }
@@ -431,13 +426,12 @@ class Downloader
                     return;
                 }
                 $timerId = Timer::tick(1000, function()use(&$timerId, $file) {
+                    // 协程不断读取任务，显示进度条
+                    $file->drawCurrentProgress();
                     if ($this->quitProgramValue) {
                         Timer::clear($timerId);
                         return;
                     }
-
-                    // 协程不断读取任务，显示进度条
-                    $file->drawCurrentProgress();
 
                     // 多任务下载可开启，命令行进度条显示才能正常
 //                  $file->cliProgressBar->nl();;
@@ -459,15 +453,17 @@ class Downloader
     }
 
     protected function createNewFiles() {
-        $waitGroup = null;
+        // 执行退出,不在进行合并操作
+        if($this->quitProgramValue) {
+            return;
+        }
+        !$this->quitProgramValue && $this->quitProgram->push(true);
+        $waitGroup = new WaitGroup();
         /**
          * @var $file FileM3u8
          */
         foreach ($this->files() as $file) {
             if ($file->getState() === FileM3u8::STATE_SUCCESS) {
-                if (is_null($waitGroup)) {
-                    $waitGroup = new WaitGroup();
-                }
                 $waitGroup->add();
                 Coroutine::create(function() use($file,$waitGroup) {
                     Coroutine::defer(fn()=>$waitGroup->done());
@@ -496,10 +492,6 @@ class Downloader
         }
 
         $waitGroup->wait();
-        // 通知消费者退出
-        if ($this->quitProgramValue === false) {
-            $this->quitProgram->push(true);
-        }
     }
 
     protected function downloadResults() {
