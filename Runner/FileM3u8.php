@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Downloader\Runner;
 
+use Dariuszp\CliProgressBar;
 use Downloader\Runner\Contracts\DecryptFileInterface;
 use Downloader\Runner\Contracts\GenerateUrlInterface;
 
@@ -87,9 +88,15 @@ abstract class FileM3u8 implements \Iterator,\Countable
 
     /**
      * 当前长度
-     * @var int $currentLength
+     * @var int $currentStep
      */
-    protected int $currentLength = 0;
+    protected int $currentStep = 0;
+
+    /**
+     * Cli 版本进度条
+     * @var CliProgressBar
+     */
+    public CliProgressBar $cliProgressBar;
 
     /**
      * 文件当前状态
@@ -126,8 +133,8 @@ abstract class FileM3u8 implements \Iterator,\Countable
         // 文件全路径 /home/1.mp4
         $this->filepath  = self::delimiter("{$this->directory}/{$this->filename}.{$suffix}");
         $this->isEncrypt = is_a(static::class, DecryptFileInterface::class,true);
-//        $this->transportStreamArray = $this->transportStreamArray();
-//        $this->second    = $this->getPlaySecond();
+        // 绘制命令行进度条
+        $this->cliProgressBar = new CliProgressBar(100, 0);
     }
 
     /**
@@ -179,15 +186,27 @@ abstract class FileM3u8 implements \Iterator,\Countable
         return $this->message;
     }
 
-    public function setCurrentProgress(int $length) :void {
+    /**
+     * @param int $length
+     */
+    public function setCurrentStep(int $length) :void {
         if ($length < 1) {
-            $length = 0;
+            throw new \InvalidArgumentException("进度条任务读取异常: {$length} < 1.");
         }
-        $this->currentLength += $length;
+        $stepLength = $this->count();
+        if ($length > $stepLength) {
+            throw new \InvalidArgumentException("进度条任务读取异常: {$length} > {$stepLength}.");
+        }
+        $this->currentStep += $length;
     }
 
-    public function getCurrentProgress(): int {
-        return $this->currentLength;
+    public function drawCurrentProgress() {
+        // 没有任务，不进行显示进度条
+        if ($this->currentStep < 1) {
+            return;
+        }
+        $this->cliProgressBar->setCurrentStep($this->currentStep);
+        $this->cliProgressBar->display();
     }
 
     protected function state(int $state) : void {
@@ -229,7 +248,6 @@ abstract class FileM3u8 implements \Iterator,\Countable
             }
             $files[]  = $file;
         }
-
         return $files;
     }
 

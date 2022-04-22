@@ -339,7 +339,7 @@ class Downloader
                  */
                 foreach ($m3u8File as $tsFile) {
                     if ($tsFile->exists()) {
-                        $m3u8File->setCurrentProgress(1);
+                        $m3u8File->setCurrentStep(1);
                         $m3u8File->setFileSize($tsFile->getFileSize());
                         continue;
                     }
@@ -392,7 +392,7 @@ class Downloader
                         $fileSize = $transportStreamFile->saveFile($data);
                         $fileM3u8 = $transportStreamFile->getFileM3u8();
                         $fileM3u8->setFileSize($fileSize);
-                        $fileM3u8->setCurrentProgress(1);
+                        $fileM3u8->setCurrentStep(1);
                         return true;
                     }
                 $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
@@ -416,42 +416,44 @@ class Downloader
                    $this->waitGroup->done();
                 });
                 // 文件总数
-                $length = \count($file);
+                $length = $file->count();
                 // 绘制命令行进度条
-                $bar = new CliProgressBar($length, 0, "下载中[ {$file->getFilename()} ]: ");
-                $bar->setBarLength(100);
+                $file->cliProgressBar->setDetails("下载中[ {$file->getFilename()} ]: ");
+                $file->cliProgressBar->setBarLength(100);
+                $file->cliProgressBar->setSteps($length);
                 // 文件已存在，跳过执行
                 if ($file->exists()) {
-                    $bar->setDetails("下载完成[ {$file->getFilename()} ]: ");
-                    $bar->setCurrentStep($length);
-                    $bar->display();
-                    $bar->end();
+                    $file->cliProgressBar->setColorToGreen();
+                    $file->cliProgressBar->setDetails("下载完成[ {$file->getFilename()} ]: ");
+                    $file->cliProgressBar->setCurrentStep($length);
+                    $file->cliProgressBar->display();
+                    $file->cliProgressBar->end();
                     return;
                 }
-                $timerId = Timer::tick(1000, function()use(&$timerId, $file, $bar) {
+                $timerId = Timer::tick(1000, function()use(&$timerId, $file) {
                     if ($this->quitProgramValue) {
                         Timer::clear($timerId);
                         return;
                     }
 
-                    // 正常进度条统计
-                    $current = $file->getCurrentProgress();
-                    $bar->setCurrentStep($current);
-                    $bar->display();
-                    // 多任务下载可开启
-//                    echo PHP_EOL;
-                    if ($file->count() === $current) {
+                    // 协程不断读取任务，显示进度条
+                    $file->drawCurrentProgress();
+
+                    // 多任务下载可开启，命令行进度条显示才能正常
+//                  $file->cliProgressBar->nl();;
+                    if ($file->count() === $file->cliProgressBar->getCurrentStep()) {
                         // 标记视频下载完成
                         $file->setState(FileM3u8::STATE_SUCCESS);
-                        $bar->setDetails("下载完成[ {$file->getFilename()} ]: ");
-                        $bar->display();
-                        $bar->end();
+                        $file->cliProgressBar->setColorToGreen();
+                        $file->cliProgressBar->setDetails("下载完成[ {$file->getFilename()} ]: ");
+                        $file->cliProgressBar->display();
+                        $file->cliProgressBar->end();
                         $this->queueChannel->close();
                         Timer::clear($timerId);
                         return;
                     }
                 });
-                $bar->end();
+                $file->cliProgressBar->end();
             });
         }
     }
