@@ -288,18 +288,29 @@ class Downloader
         $this->searchNetworkFile();
         // 写入文件队列，进行下载文件任务
         $this->makeProducers();
-        // 绘制进度条
+//        // 绘制进度条
         $this->drawCliProgressBar();
-        // 管控进程
-        $this->monitorWorkerPool();
-        // 协程挂起
+//        // 协程挂起
         $this->waitGroup->wait();
-        // 开启协程加速生成视频
+//        // 管控进程
+        $this->monitorWorkerPool();
+//        // 开启协程加速生成视频
         $this->createNewFiles();
-        // 统计下载结果
+//        // 统计下载结果
         $this->downloadResults();
-        // 输出下载时间
+//        // 输出下载时间
         $this->timeCost();
+    }
+
+    public function start2()
+    {
+        if (self::STATE_RUNNING === self::$stateCurrent) {
+            throw new \RuntimeException('无效启动状态!');
+        }
+        // 安装信号处理器
+        $this->installSignal();
+        // 查找网络文件
+        $this->searchNetworkFile();
     }
 
     protected function monitorWorkerPool() {
@@ -328,13 +339,16 @@ class Downloader
                 $m3u8File->setState(FileM3u8::STATE_SUCCESS);
                 continue;
             }
+            $this->waitGroup->add();
             Coroutine::create(function()use($m3u8File) {
+                Coroutine::defer(fn()=>$this->waitGroup->done());
                 /**
                  * @var TransportStreamFile $tsFile
                  */
                 foreach ($m3u8File as $tsFile) {
                     if ($tsFile->exists()) {
-                        $m3u8File->setCurrentStep(1);
+                        $tsFile->setState(TransportStreamFile::STATE_SUCCESS);
+                        $m3u8File->cliProgressBar->addCurrentStep(1);
                         $m3u8File->setFileSize($tsFile->getFileSize());
                         continue;
                     }
@@ -370,7 +384,7 @@ class Downloader
                     if (!$file) {
                        break;
                     }
-                    $this->downloadTsFragment($file, 3, 30);
+                    $this->downloadTsFragment($file, 6, 15);
                 }
             });
         }
@@ -387,7 +401,7 @@ class Downloader
                         $fileSize = $transportStreamFile->saveFile($data);
                         $fileM3u8 = $transportStreamFile->getFileM3u8();
                         $fileM3u8->setFileSize($fileSize);
-                        $fileM3u8->setCurrentStep(1);
+                        $fileM3u8->cliProgressBar->addCurrentStep(1);
                         return true;
                     }
                 $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
@@ -412,12 +426,9 @@ class Downloader
                 });
                 // 文件总数
                 $length = $file->count();
-                // 绘制命令行进度条
-                $file->cliProgressBar->setDetails("下载中[ {$file->getFilename()} ]: ");
-                $file->cliProgressBar->setBarLength(100);
-                $file->cliProgressBar->setSteps($length);
                 // 文件已存在，跳过执行
                 if ($file->exists()) {
+                    $file->setState(FileM3u8::STATE_SUCCESS);
                     $file->cliProgressBar->setColorToGreen();
                     $file->cliProgressBar->setDetails("下载完成[ {$file->getFilename()} ]: ");
                     $file->cliProgressBar->setCurrentStep($length);
@@ -425,17 +436,19 @@ class Downloader
                     $file->cliProgressBar->end();
                     return;
                 }
-                $timerId = Timer::tick(1000, function()use(&$timerId, $file) {
-                    // 协程不断读取任务，显示进度条
-                    $file->drawCurrentProgress();
-                    if ($this->quitProgramValue) {
-                        Timer::clear($timerId);
-                        return;
-                    }
+                while(1)
+                {
+                    // 绘制命令行进度条
+                    $file->cliProgressBar->setDetails("下载中[ {$file->getFilename()} ]: ");
+                    $file->cliProgressBar->setBarLength(100);
+                    $file->cliProgressBar->setSteps($length);
 
+                    // 协程不断读取任务，显示进度条
+                    $file->cliProgressBar->display();
                     // 多任务下载可开启，命令行进度条显示才能正常
-//                  $file->cliProgressBar->nl();;
-                    if ($file->count() === $file->cliProgressBar->getCurrentStep()) {
+//                    $file->cliProgressBar->nl();;
+                    Coroutine::sleep(0.8);
+                    if ($file->cliProgressBar->getSteps() === $file->cliProgressBar->getCurrentStep()) {
                         // 标记视频下载完成
                         $file->setState(FileM3u8::STATE_SUCCESS);
                         $file->cliProgressBar->setColorToGreen();
@@ -443,12 +456,14 @@ class Downloader
                         $file->cliProgressBar->display();
                         $file->cliProgressBar->end();
                         $this->queueChannel->close();
-                        Timer::clear($timerId);
                         return;
                     }
-                });
-                $file->cliProgressBar->end();
+                    if ($this->quitProgramValue) {
+                        return;
+                    }
+                }
             });
+//            $file->cliProgressBar->end();
         }
     }
 
@@ -458,19 +473,24 @@ class Downloader
             return;
         }
         !$this->quitProgramValue && $this->quitProgram->push(true);
-        $waitGroup = new WaitGroup();
+        $waitGroup = null;
         /**
          * @var $file FileM3u8
          */
         foreach ($this->files() as $file) {
+            // 文件存在不创建协程生成视频文件
+            if ($file->exists()) {
+                $file->setState(FileM3u8::STATE_SUCCESS);
+                continue;
+            }
+            //  文件下载完成,开始合并
             if ($file->getState() === FileM3u8::STATE_SUCCESS) {
+                if (is_null($waitGroup)) {
+                    $waitGroup = new WaitGroup();
+                }
                 $waitGroup->add();
                 Coroutine::create(function() use($file,$waitGroup) {
                     Coroutine::defer(fn()=>$waitGroup->done());
-                    // 文件存在
-                    if ($file->exists()) {
-                        return;
-                    }
                     try
                     {
                         /**
@@ -490,8 +510,9 @@ class Downloader
                 });
             }
         }
-
-        $waitGroup->wait();
+        if (!is_null($waitGroup)) {
+            $waitGroup->wait();
+        }
     }
 
     protected function downloadResults() {

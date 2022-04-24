@@ -9,10 +9,6 @@ class CreateFFmpegVideoListener
 
     public function createBinaryFile(CreateVideoFileEvent $event) {
         $file = $event->getFileM3u8();
-        // 文件存在停止创建视频文件
-        if ($file->exists()) {
-            return;
-        }
 //        $suffix = $event->getSuffix();
         // 本地文件名称
         $filename = "{$file->getFilePath()}";

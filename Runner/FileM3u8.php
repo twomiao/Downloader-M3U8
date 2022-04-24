@@ -186,29 +186,6 @@ abstract class FileM3u8 implements \Iterator,\Countable
         return $this->message;
     }
 
-    /**
-     * @param int $length
-     */
-    public function setCurrentStep(int $length) :void {
-        if ($length < 1) {
-            throw new \InvalidArgumentException("进度条任务读取异常: {$length} < 1.");
-        }
-        $stepLength = $this->count();
-        if ($length > $stepLength) {
-            throw new \InvalidArgumentException("进度条任务读取异常: {$length} > {$stepLength}.");
-        }
-        $this->currentStep += $length;
-    }
-
-    public function drawCurrentProgress() {
-        // 没有任务，不进行显示进度条
-        if ($this->currentStep < 1) {
-            return;
-        }
-        $this->cliProgressBar->setCurrentStep($this->currentStep);
-        $this->cliProgressBar->display();
-    }
-
     protected function state(int $state) : void {
         switch ($state) {
             case self::STATE_FAIL:

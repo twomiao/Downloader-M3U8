@@ -128,7 +128,7 @@ class TransportStreamFile
         $client = new HttpClient($this->url, $timeout);
         $response = $client->send();
         $headers = $response->getHeaders();
-        if ($headers['content_type'] === 'video/mp2t' && $headers['http_code'] === 200) {
+        if ($headers['http_code'] === 200) {
             return $response->getBody();
         }
         return null;
