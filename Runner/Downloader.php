@@ -462,7 +462,6 @@ class Downloader
                     }
                 }
             });
-//            $file->cliProgressBar->end();
         }
     }
 
