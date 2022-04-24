@@ -454,7 +454,6 @@ class Downloader
                         $file->cliProgressBar->setColorToGreen();
                         $file->cliProgressBar->setDetails("下载完成[ {$file->getFilename()} ]: ");
                         $file->cliProgressBar->display();
-                        $file->cliProgressBar->end();
                         $this->queueChannel->close();
                         return;
                     }
