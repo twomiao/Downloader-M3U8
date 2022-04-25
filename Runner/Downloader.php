@@ -302,17 +302,6 @@ class Downloader
         $this->timeCost();
     }
 
-    public function start2()
-    {
-        if (self::STATE_RUNNING === self::$stateCurrent) {
-            throw new \RuntimeException('无效启动状态!');
-        }
-        // 安装信号处理器
-        $this->installSignal();
-        // 查找网络文件
-        $this->searchNetworkFile();
-    }
-
     protected function monitorWorkerPool() {
         Coroutine::create(function() {
            $this->quitProgramValue = $this->quitProgram->pop();
