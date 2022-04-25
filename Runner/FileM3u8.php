@@ -87,12 +87,6 @@ abstract class FileM3u8 implements \Iterator,\Countable
     protected string $filepath;
 
     /**
-     * 当前长度
-     * @var int $currentStep
-     */
-    protected int $currentStep = 0;
-
-    /**
      * Cli 版本进度条
      * @var CliProgressBar
      */
@@ -223,8 +217,10 @@ abstract class FileM3u8 implements \Iterator,\Countable
                 $fileUrl  = static::generateUrl($file);
                 $file->setUrl($fileUrl);
             }
+
             $files[]  = $file;
         }
+
         return $files;
     }
 

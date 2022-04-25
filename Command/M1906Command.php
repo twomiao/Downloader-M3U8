@@ -3,6 +3,10 @@
 namespace Downloader\Command;
 
 use Downloader\Files\M1905File;
+use Downloader\Files\TestFile;
+use Downloader\Runner\CreateBinaryVideoListener;
+use Downloader\Runner\CreateFFmpegVideoListener;
+use Downloader\Runner\CreateVideoFileEvent;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -15,13 +19,13 @@ use Downloader\Runner\DownloaderServiceProvider;
  * Class M1905Command
  * @package Downloader\Command
  */
-class M1905Command extends Command
+class M1906Command extends Command
 {
     protected PimpleContainer $container;
 
     protected function configure()
     {
-        $this->setName('m1905')
+        $this->setName('m1906')
             ->addOption('max_workers', 'M', InputArgument::OPTIONAL, '下载任务，使用的协程池数量', 35)
             ->setDescription('Downloader-M3U8 并发下载程序.')
             ->setHelp('php Downloader.php [Command] -M [workers]');
@@ -35,10 +39,9 @@ class M1905Command extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-
         $files = [
-           '黄金大劫案' => "https://m3u8i.vodfile.m1905.com/202204061603/c9b4b805a5148ce77e6a5895ffaf8166/movie/2019/10/22/m201910227KZFWKWLUKB73EXO/10A994B56920FEEAC04EB5799.m3u8"
-//           '无人区' => "https://m3u8i.vodfile.m1905.com/202204021350/0062d1437e77ebde0ceedd6ab7022532/movie/2014/07/08/m2014070882MYZ4QYL20IY6US/m2014070882MYZ4QYL20IY6US.m3u8"
+            '信箱E-mail' => 'https://m3u8i.vodfile.m1905.com/202204260052/d92679a1b901eed8925454bccb7ee781/movie/2018/05/08/m20180508SE2ARG3KGXHQBBI2/669E1732364FBF72253C66547.m3u8',
+            '绣春刀' =>'https://m3u8i.vodfile.m1905.com/202204260054/64ab7256564627bee96504ea6d3b8e39/movie/2014/08/27/m20140827JS2X55SR00OY3A16/m20140827JS2X55SR00OY3A16.m3u8'
         ];
 
         // 推荐安装 FFMPEG 生成指定视频格式文件
@@ -48,18 +51,17 @@ class M1905Command extends Command
         //    此监听器必须安装FFMPEG 程序，才可以正常使用 [推荐的方式]
         // 3. 默认使用 [二进制文件格式] 创建视频文件
         // 4. 用户自行安装FFMPEG 程序，直接把下面这段注释去掉，自动改为FFMPEG 生成视频文件格式
-//       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);
+       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateFFmpegVideoListener::METHOD_NAME]);
 
         $downloader  = new Downloader($this->container, $input, $output);
-        $downloader->setConcurrencyValue(15);
-        $downloader->setQueueValue(30);
+        $downloader->setConcurrencyValue(25);
 
         foreach ($files as $name => $url)
         {
             try
             {
                 // 创建视频为mp4格式
-                $file = new M1905File($url, DOWNLOAD_DIR.'/黄金大劫案', $name, 'mp4');
+                $file = new M1905File($url, DOWNLOAD_DIR.'/test', $name, 'mp4');
                 $downloader->addFile($file);
             }catch (\Exception $e) {
                 var_dump($e->getMessage());

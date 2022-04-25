@@ -21,9 +21,8 @@ class CreateFFmpegVideoListener
         if ( !$success = self::ffmpegFilePath($file, $ffmpegTextFile ) ) {
             throw new \Exception("FFMPEG命令生成失败: {$file->getFilePath()}.");
         }
-//        $command = "/usr/bin/ffmpeg -f concat -safe 0 -i {$ffmpegTextFile}  -acodec copy -vcodec copy -absf aac_adtstoasc {$filename} >/dev/null 2>&1";
         $command = "/usr/bin/ffmpeg -f concat -safe 0 -i {$ffmpegTextFile}  -c copy  {$filename} >/dev/null 2>&1";
-//        print date('Y-m-d H:i:s'). " >正在执行FFMPEG 命令[{$command}], 创建视频文件: {$filename}.\n";
+//        $command = "/usr/bin/ffmpeg -f concat -safe 0 -i {$ffmpegTextFile}  -c copy  {$filename}";
         print date('Y-m-d H:i:s'). " >正在执行FFMPEG命令, 创建视频文件: {$filename}.\n";
         try {
             if( !$res = System::exec($command)) {
