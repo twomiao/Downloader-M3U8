@@ -34,6 +34,7 @@ class CreateFFmpegVideoListener
         print date('Y-m-d H:i:s'). " >正在删除[{$filename}]的分片文件 .....".PHP_EOL;
         $this->deleteFiles($file);
         print date('Y-m-d H:i:s'). " >已生成视频文件: {$filename}.".PHP_EOL;
+        $file->setState(FileM3u8::STATE_SUCCESS);
     }
 
     /**

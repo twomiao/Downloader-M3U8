@@ -17,6 +17,7 @@
    * Ctrl+C 暂停下载进程 再按Ctrl+C 恢复下载进程。
    * SIGTERM 信号完成平滑停止下载进程，防止SIGKILL导致数据丢失。
    * Pcntl+MultiCurl 也可以实现。
+   * 增加JSON文件模板下载文件。
   
 ### 环境要求
 
@@ -114,6 +115,9 @@ run(function () {
 namespace Downloader\Command;
 
 use Downloader\Files\M1905File;
+use Downloader\Runner\Command\FileTemplate;
+use Downloader\Runner\CreateFFmpegVideoListener;
+use Downloader\Runner\CreateVideoFileEvent;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -126,13 +130,13 @@ use Downloader\Runner\DownloaderServiceProvider;
  * Class M1905Command
  * @package Downloader\Command
  */
-class M1905Command extends Command
+class M1906Command extends Command
 {
     protected PimpleContainer $container;
 
     protected function configure()
     {
-        $this->setName('m1905')
+        $this->setName('m1906')
             ->addOption('max_workers', 'M', InputArgument::OPTIONAL, '下载任务，使用的协程池数量', 35)
             ->setDescription('Downloader-M3U8 并发下载程序.')
             ->setHelp('php Downloader.php [Command] -M [workers]');
@@ -146,12 +150,14 @@ class M1905Command extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+//        $files = [
+//            "花与棋" => 'https://m3u8i.vodfile.m1905.com/202205150225/4da2def47f866367838ba6f3e9d55303/movie/2018/10/25/m201810250GDNYALQQX19HR1P/145502A2CA0ADBA349064BD2E.m3u8',
+//            '把妈妈嫁出去' => 'https://m3u8i.vodfile.m1905.com/202205150225/4da2def47f866367838ba6f3e9d55303/movie/2017/10/11/m20171011INJ4QIAI1GJIZ18D/2C50A79A9292E6D423E015FFE.m3u8'
+//        ];
 
-        $files = [
-           '黄金大劫案' => "https://m3u8i.vodfile.m1905.com/202204061603/c9b4b805a5148ce77e6a5895ffaf8166/movie/2019/10/22/m201910227KZFWKWLUKB73EXO/10A994B56920FEEAC04EB5799.m3u8"
-//           '无人区' => "https://m3u8i.vodfile.m1905.com/202204021350/0062d1437e77ebde0ceedd6ab7022532/movie/2014/07/08/m2014070882MYZ4QYL20IY6US/m2014070882MYZ4QYL20IY6US.m3u8"
-        ];
-
+        $files = self::readTemplateJson(
+            $templateFilePath = self::templateFilePath()
+        );
         // 推荐安装 FFMPEG 生成指定视频格式文件
         // 1. Downloader\Runner\CreateBinaryVideoListener::class 二进制文件格式
         //    不需要安装任何程序，自动生成二进制文件
@@ -159,25 +165,57 @@ class M1905Command extends Command
         //    此监听器必须安装FFMPEG 程序，才可以正常使用 [推荐的方式]
         // 3. 默认使用 [二进制文件格式] 创建视频文件
         // 4. 用户自行安装FFMPEG 程序，直接把下面这段注释去掉，自动改为FFMPEG 生成视频文件格式
-//       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);
+       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateFFmpegVideoListener::METHOD_NAME]);
 
         $downloader  = new Downloader($this->container, $input, $output);
-        $downloader->setConcurrencyValue(15);
-        $downloader->setQueueValue(30);
-
-        foreach ($files as $name => $url)
+        $downloader->setConcurrencyValue(30);
+        $downloader->setMode(Downloader::MODE_JSON);
+        foreach ($files as $jsonFile)
         {
             try
             {
                 // 创建视频为mp4格式
-                $file = new M1905File($url, DOWNLOAD_DIR.'/黄金大劫案', $name, 'mp4');
+                $file = new M1905File($jsonFile['m3u8_url'], $jsonFile['put_path']);
+                $file->saveAs($jsonFile['filename'], $jsonFile['suffix']);
+                $file->loadJsonFile($jsonFile);
+//                $file->setDecryptCall(function($data, $key,$method) {
+//                    return openssl_decrypt($data, $method, $key, OPENSSL_RAW_DATA);
+//                });
+                // 添加下载文件任务
                 $downloader->addFile($file);
-            }catch (\Exception $e) {
+            } catch (\Exception $e) {
                 var_dump($e->getMessage());
             }
         }
         $downloader->start();
         return Command::SUCCESS;
+    }
+
+    protected static function readTemplateJson(string $templateFile) : array {
+        if (!\file_exists($templateFile)) {
+            throw new \RuntimeException('加载模板文件失败:'.$templateFile);
+        }
+
+        $template = \file_get_contents($templateFile);
+        if (!$template) {
+            throw new \RuntimeException('模板Json文件读取失败:'.$template);
+        }
+        $data =  \json_decode($template, true);
+        if($data === false) {
+            throw new \RuntimeException('模板Json文件内容解析错误:'.\json_last_error_msg());
+        }
+
+        return $data['files'];
+    }
+
+
+    /**
+     * 加载模板文件
+     * @return string
+     */
+    protected static function templateFilePath() : string
+    {
+        return \getcwd().DIRECTORY_SEPARATOR.'234234'.DIRECTORY_SEPARATOR.FileTemplate::FILENAME;
     }
 }
 ```

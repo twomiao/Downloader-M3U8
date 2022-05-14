@@ -5,8 +5,6 @@ use Swoole\Coroutine\System;
 
 class TransportStreamFile
 {
-    use Delimiter;
-
     /**
      * @var int
      */
@@ -58,15 +56,14 @@ class TransportStreamFile
      * @param string $url
      * @param string $filename
      * @param float $duration
-     * @param string $directoryPath
+     * @param string $absolutePath
      */
-    public function __construct(string $url, string $filename, float $duration, string $directoryPath)
+    public function __construct(string $url, string $filename, float $duration, string $absolutePath)
     {
         $this->url = $url;
-        $filename = \trim($filename);
-        $filetype = \strripos(\trim($filename),'.ts') === false ? 'ts' : '';
-        $this->filename = "{$filename}.{$filetype}";
-        $this->filePath = "{$directoryPath}/".self::delimiter( $this->filename );
+        $suffix = \strripos(\trim($filename),'.ts') === false ? 'ts' : '';
+        $this->filename = \trim($filename).".{$suffix}";
+        $this->filePath = rtrim($absolutePath,'\/'). DIRECTORY_SEPARATOR.$this->filename;
         $this->duration = $duration;
         \restore_error_handler();
     }
@@ -109,7 +106,14 @@ class TransportStreamFile
            return \filesize($this->filePath);
         }
 
-        if ($this->fileM3u8->isEncryptFile()) {
+        if (Downloader::isModel(Downloader::MODE_JSON) && $this->fileM3u8->isEncryptFile()) {
+            // 可以进行二次验证
+            $data = $this->fileM3u8->jsonDecrypt(
+                $data,
+                $this->fileM3u8->getJsonFile('key'),
+                $this->fileM3u8->getJsonFile('method'),
+            );
+        } else if ($this->fileM3u8->isEncryptFile()) {
             $data = $this->fileM3u8->decrypt($data, $this->fileM3u8);
         }
         if (System::writeFile($this->filePath, $data) === false) {

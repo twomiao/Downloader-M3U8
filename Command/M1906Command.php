@@ -3,8 +3,7 @@
 namespace Downloader\Command;
 
 use Downloader\Files\M1905File;
-use Downloader\Files\TestFile;
-use Downloader\Runner\CreateBinaryVideoListener;
+use Downloader\Runner\Command\FileTemplate;
 use Downloader\Runner\CreateFFmpegVideoListener;
 use Downloader\Runner\CreateVideoFileEvent;
 use Symfony\Component\Console\Command\Command;
@@ -39,11 +38,14 @@ class M1906Command extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $files = [
-            '信箱E-mail' => 'https://m3u8i.vodfile.m1905.com/202204260052/d92679a1b901eed8925454bccb7ee781/movie/2018/05/08/m20180508SE2ARG3KGXHQBBI2/669E1732364FBF72253C66547.m3u8',
-            '绣春刀' =>'https://m3u8i.vodfile.m1905.com/202204260054/64ab7256564627bee96504ea6d3b8e39/movie/2014/08/27/m20140827JS2X55SR00OY3A16/m20140827JS2X55SR00OY3A16.m3u8'
-        ];
+//        $files = [
+//            "花与棋" => 'https://m3u8i.vodfile.m1905.com/202205150225/4da2def47f866367838ba6f3e9d55303/movie/2018/10/25/m201810250GDNYALQQX19HR1P/145502A2CA0ADBA349064BD2E.m3u8',
+//            '把妈妈嫁出去' => 'https://m3u8i.vodfile.m1905.com/202205150225/4da2def47f866367838ba6f3e9d55303/movie/2017/10/11/m20171011INJ4QIAI1GJIZ18D/2C50A79A9292E6D423E015FFE.m3u8'
+//        ];
 
+        $files = self::readTemplateJson(
+            $templateFilePath = self::templateFilePath()
+        );
         // 推荐安装 FFMPEG 生成指定视频格式文件
         // 1. Downloader\Runner\CreateBinaryVideoListener::class 二进制文件格式
         //    不需要安装任何程序，自动生成二进制文件
@@ -54,20 +56,53 @@ class M1906Command extends Command
        $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateFFmpegVideoListener::METHOD_NAME]);
 
         $downloader  = new Downloader($this->container, $input, $output);
-        $downloader->setConcurrencyValue(25);
-
-        foreach ($files as $name => $url)
+        $downloader->setConcurrencyValue(12);
+        $downloader->setMode(Downloader::MODE_JSON);
+        foreach ($files as $jsonFile)
         {
             try
             {
                 // 创建视频为mp4格式
-                $file = new M1905File($url, DOWNLOAD_DIR.'/test', $name, 'mp4');
+                $file = new M1905File($jsonFile['m3u8_url'], $jsonFile['put_path']);
+                $file->saveAs($jsonFile['filename'], $jsonFile['suffix']);
+                $file->loadJsonFile($jsonFile);
+//                $file->setDecryptCall(function($data, $key,$method) {
+//                    return openssl_decrypt($data, $method, $key, OPENSSL_RAW_DATA);
+//                });
+                // 添加下载文件任务
                 $downloader->addFile($file);
-            }catch (\Exception $e) {
+            } catch (\Exception $e) {
                 var_dump($e->getMessage());
             }
         }
         $downloader->start();
         return Command::SUCCESS;
+    }
+
+    protected static function readTemplateJson(string $templateFile) : array {
+        if (!\file_exists($templateFile)) {
+            throw new \RuntimeException('加载模板文件失败:'.$templateFile);
+        }
+
+        $template = \file_get_contents($templateFile);
+        if (!$template) {
+            throw new \RuntimeException('模板Json文件读取失败:'.$template);
+        }
+        $data =  \json_decode($template, true);
+        if($data === false) {
+            throw new \RuntimeException('模板Json文件内容解析错误:'.\json_last_error_msg());
+        }
+
+        return $data['files'];
+    }
+
+
+    /**
+     * 加载模板文件
+     * @return string
+     */
+    protected static function templateFilePath() : string
+    {
+        return \getcwd().DIRECTORY_SEPARATOR.'234234'.DIRECTORY_SEPARATOR.FileTemplate::FILENAME;
     }
 }

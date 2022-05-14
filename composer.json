@@ -23,7 +23,8 @@
     "symfony/console": "^5.2",
     "pimple/pimple": "^3.3",
     "symfony/event-dispatcher": "^5.4",
-    "dariuszp/cli-progress-bar": "^1.0"
+    "dariuszp/cli-progress-bar": "^1.0",
+    "ext-json": "*"
   },
   "autoload": {
     "psr-4": {

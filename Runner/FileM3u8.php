@@ -20,14 +20,6 @@ use Downloader\Runner\Contracts\GenerateUrlInterface;
  */
 abstract class FileM3u8 implements \Iterator,\Countable
 {
-    use Delimiter;
-
-    /**
-     * 下载成功
-     * @var int
-     */
-    public const STATE_SUCCESS = 1;
-
     /**
      * 下载失败
      * @var int
@@ -35,16 +27,34 @@ abstract class FileM3u8 implements \Iterator,\Countable
     public const STATE_FAIL = 2;
 
     /**
-     * 初始化
+     * 下载成功
      * @var int
      */
-    public const STATE_INIT  = 3;
+    public const STATE_SUCCESS = 10;
+
+    /**
+     * 请求文件阶段
+     * @var int
+     */
+    public const STATE_REQUESTING_FILE = 3;
+
+    /**
+     * 请求文件成功
+     * @var int
+     */
+    public const STATE_REQUEST_SUCCESS = 5;
 
     /**
      * 获取成功
      * @var int
      */
-    public const STATE_CONTENT_SUCCESS  = 4;
+    public const STATE_CONTENT_SUCCESS = 4;
+
+    /**
+     * 等待请求
+     * @var int
+     */
+    public const STATE_REQUEST_WAIT = 6;
 
     /**
      * @var string $url
@@ -64,15 +74,22 @@ abstract class FileM3u8 implements \Iterator,\Countable
     protected float $second = 0.0;
 
     /**
+     * 文件名称
      * @var string $filename
      */
     protected string $filename;
 
     /**
-     * 保存到指定位置
-     * @var string $directory
+     * 文件后缀
+     * @var string $suffix
      */
-    protected string $directory;
+    protected string $suffix;
+
+    /**
+     * 保存到指定位置
+     * @var string $absolutePath
+     */
+    protected string $absolutePath;
 
     /**
      * 字节大小
@@ -96,13 +113,7 @@ abstract class FileM3u8 implements \Iterator,\Countable
      * 文件当前状态
      * @var int $state
      */
-    protected int $state = self::STATE_INIT;
-
-    /**
-     * 视频是否加密
-     * @var bool $isEncrypt
-     */
-    protected bool $isEncrypt = false;
+    protected int $state = self::STATE_REQUEST_WAIT;
 
     /**
      * @var array $transportStreamArray
@@ -110,58 +121,151 @@ abstract class FileM3u8 implements \Iterator,\Countable
     protected array $transportStreamArray = [];
 
     /**
+     * 自定义解密
+     * @var ?\Closure $callDecrypt
+     */
+    protected ?\Closure $callDecrypt = null;
+
+    /**
+     * json 文件行信息
+     * @var array $file
+     */
+    protected array $file = [];
+
+    /**
      * FileM3u8 constructor.
      * @param string $url
      * @param string $absolutePath
-     * @param $filename
-     * @param $suffix
      * @throws \Exception
      */
-    public function __construct(string $url, string $absolutePath, string $filename, string $suffix)
+    public function __construct(string $url, string $absolutePath)
     {
         $this->url = $url;
         // /home
-        $this->directory = $this->mkdir($absolutePath);
-        // 1.mp4
-        $this->filename  = $filename;
-        // 文件全路径 /home/1.mp4
-        $this->filepath  = self::delimiter("{$this->directory}/{$this->filename}.{$suffix}");
-        $this->isEncrypt = is_a(static::class, DecryptFileInterface::class,true);
+        $this->absolutePath = $absolutePath;
         // 绘制命令行进度条
         $this->cliProgressBar = new CliProgressBar(100, 0);
     }
 
     /**
-     * @param string $directory
-     * @return string|null
+     * @param string $filename
+     * @param string $suffix
+     * @param int $permissions
      * @throws \Exception
      */
-    protected function mkdir(string $directory): ?string
+    public function saveAs(string $filename, string $suffix, $permissions = 0777): void
     {
-        if ($dir_exists = is_dir($directory)) {
-            return $directory;
-        }
-        // /home/hello/world
-        if (!mkdir($directory, 0777, true)) {
-            throw new \Exception('目录创建失败：' . $directory);
-        }
-        return $directory;
+        // 文件全路径 /home/1.mp4
+        $this->filename = $filename;
+        $this->suffix = $suffix;
+        $this->filepath = rtrim($this->absolutePath, '\/') . DIRECTORY_SEPARATOR . "{$filename}.{$suffix}";
+        $this->mkdir($permissions);
     }
 
-    public function setState(int $state) : void
+    /**
+     * 获取文件路径
+     * @return string
+     */
+    public function getFilePath(): string
+    {
+        if (empty($this->filepath)) {
+            throw new \BadMethodCallException("文件另存为路径不存在.");
+        }
+        return $this->filepath;
+    }
+
+    /**
+     * 创建存储目录
+     * @param int $permissions
+     * @return string
+     * @throws \Exception
+     */
+    public function mkdir($permissions = 0777): string
+    {
+        if (is_dir($this->absolutePath)) {
+            return $this->absolutePath;
+        }
+        if (!mkdir($this->absolutePath, $permissions, true)) {
+            throw new \Exception('目录创建失败：' . $this->absolutePath);
+        }
+        return $this->absolutePath;
+    }
+
+    public function setState(int $state): void
     {
         $this->state($state);
     }
+
+    /**
+     * 加载文件行
+     * @param array $file
+     * @return void
+     */
+    public function loadJsonFile(array $file): void
+    {
+        $fields = [
+            'filename' => '',
+            'm3u8_url' => '',
+            'url_prefix' => '',
+            'suffix' => 'mp4',
+            'key' => '',
+            'method' => '',
+            'put_path' => '',
+        ];
+        foreach ($file as $field => $value) {
+            if (!array_key_exists($field, $fields)) {
+                throw new \InvalidArgumentException('json key 无效:' . $field);
+            }
+        }
+        $this->file = $file;
+    }
+
+    /**
+     * 获取当前文件内容
+     * @param string $key
+     * @return string
+     */
+    public function getJsonFile(string $key) :string {
+        return $this->file[$key] ?? '';
+    }
+
+    public function setDecryptCall(\Closure $callDecrypt) : void {
+        $this->callDecrypt = $callDecrypt;
+    }
+
+    /**
+     * 用户自定义解密
+     * @param $data
+     * @param $key
+     * @param $method
+     * @return string
+     */
+    public function jsonDecrypt($data, $key, $method): string
+    {
+        if (!$this->callDecrypt) {
+            throw new \BadMethodCallException(__METHOD__.' 错误方法调用.');
+        }
+        $callDecrypt = $this->callDecrypt;
+
+        return $callDecrypt($data, $key,$method);
+    }
+
 
     public function getStateText() : string
     {
         switch ($this->state) {
             case self::STATE_FAIL:
                 return '失败';
-            case self::STATE_INIT:
-                return '初始化';
+            case self::STATE_REQUESTING_FILE:
+                return '请求文件中';
+            case self::STATE_REQUEST_SUCCESS:
+                return '请求文件完成';
+            case self::STATE_CONTENT_SUCCESS:
+                return '加载文件完成';
+            case self::STATE_REQUEST_WAIT:
+                return '等待文件请求';
             case self::STATE_SUCCESS:
-                return '成功';
+                return '下载完成';
         }
         return '未定义';
     }
@@ -182,10 +286,12 @@ abstract class FileM3u8 implements \Iterator,\Countable
 
     protected function state(int $state) : void {
         switch ($state) {
-            case self::STATE_FAIL:
-            case self::STATE_INIT:
-            case self::STATE_SUCCESS:
-            case self::STATE_CONTENT_SUCCESS:
+            case self::STATE_FAIL: // 发生异常，失败
+            case self::STATE_REQUEST_WAIT: // 待请求状态
+            case self::STATE_REQUESTING_FILE: // 正在进行网络请求
+            case self::STATE_REQUEST_SUCCESS: // 网络请求成功
+            case self::STATE_CONTENT_SUCCESS:  // 加载完成
+            case self::STATE_SUCCESS:  // 加载完成
                  $this->state = $state;
                return;
         }
@@ -199,9 +305,21 @@ abstract class FileM3u8 implements \Iterator,\Countable
     public function transportStreamArray() : array
     {
         $files = [];
-        // 文件结构信息
+        // 标记当前状态
+        $this->setState(self::STATE_REQUESTING_FILE);
+
+        if (Downloader::isModel(Downloader::MODE_JSON) && empty($this->file)) {
+            throw new \InvalidArgumentException('m3u8 文件为空');
+        }
+        /**
+         * 文件结构信息
+         * @var FileInfoM3u8 $fileInfo
+         */
         $fileInfo = FileInfoM3u8::parse($raw_data = $this->getRawData());
-        // 时间集合
+        /**
+         * 时间集合
+         * @var array $timeArray
+         */
         $timeArray = $fileInfo->getTimeArray();
 
         /**
@@ -211,13 +329,20 @@ abstract class FileM3u8 implements \Iterator,\Countable
             $duration = floatval($timeArray[$idx]); // 每片段时间
             $filename = pathinfo($tsPath, PATHINFO_FILENAME); // 文件名称
             $fileUrl  = $tsPath;    // 如果是完整地址
-            $file     = new TransportStreamFile($fileUrl, $filename, $duration, $this->directory);
+            $file     = new TransportStreamFile($fileUrl, $filename, $duration, $this->absolutePath);
             $file->setFileM3u8($this);
-            if (is_a(static::class, GenerateUrlInterface::class,true)) {
-                $fileUrl  = static::generateUrl($file);
-                $file->setUrl($fileUrl);
-            }
 
+            // 读取json 配置文件模式
+            if(Downloader::isModel(Downloader::MODE_JSON)) {
+                // https://baidu.com/11.ts
+                $fileUrl  = rtrim($this->file['url_prefix'], '\/')
+                    .DIRECTORY_SEPARATOR. $file->getUrl();
+            } elseif  (is_a(static::class,
+                GenerateUrlInterface::class,true)
+            ) {
+                $fileUrl  = static::generateUrl($file);
+            }
+            $file->setUrl($fileUrl);
             $files[]  = $file;
         }
 
@@ -253,133 +378,45 @@ abstract class FileM3u8 implements \Iterator,\Countable
         $this->fileSizeBytes += $fileSize;
     }
 
+    /**
+     * 下载网络流量大小
+     * @return int
+     */
     public function getFileSize() : int {
         return $this->fileSizeBytes;
     }
 
     public function getRawData() : string
     {
-        if (!$raw_data = \file_get_contents($this->url))
+        try
         {
-            throw new \Exception('获取原始数据失败:'.$this->url, 101);
+            $client = new HttpClient($this->url);
+            $response = $client->send();
+        } catch (\Exception $e) {
+            throw new \RuntimeException("获取原始数据失败:{$this->url},{$e->getMessage()}", 101);
         }
-        return $raw_data;
+        $this->setState(self::STATE_REQUEST_SUCCESS);
+        return $response->getBody();
     }
 
-    public function getFilename() : string
-    {
+    public function getFilename() : string {
         return $this->filename;
     }
 
     public function isEncryptFile():bool {
-        return $this->isEncrypt;
-    }
-
-    /**
-     * 拼接整个视频片段字符串
-     * @param bool $overwrite
-     * @return string|null
-     */
-    public function mergeFileUrl( bool $overwrite = false ) : ?string
-    {
-        $file_exists = $this->exists();
-        // 文件存在，直接覆盖写入文件
-        if ($file_exists && $overwrite) {
-            unlink($this->filepath);
+        if (is_a(static::class, DecryptFileInterface::class,true)) {
+            return true;
+        } elseif (array_key_exists('key', $this->file) &&
+            array_key_exists('method', $this->file))
+        {
+            return true;
         }
-
-        if ($file_exists || $this->isEmpty()) {
-            return null;
-        }
-
-        $path = '';
-        foreach ($this->transportStreamArray as $file) {
-            if ($file instanceof TransportStreamFile)
-            {
-                // 读取已经下载的视频片段
-                $filepath = $file->getFilePath();
-                if ($path !== '')
-                {
-                    $path .= '|'.$filepath;
-                    continue;
-                }
-                $path .= $filepath;
-            }
-        }
-        return $path;
+        return false;
     }
 
     protected function isEmpty() :bool
     {
         return empty($this->transportStreamArray);
-    }
-
-    /**
-     * 写入二进制文件,返回字节数
-     * @param string|null $data
-     * @param string $suffix
-     * @param bool $overwrite
-     * @return int
-     */
-    public function writeBinaryFile(?string $data = null, string $suffix = 'mp4', bool $overwrite = false) :int
-    {
-        $fileSize = 0;
-        $file_exists = $this->exists();
-        // 是否覆盖 true, 文件存在删除，然后进行写入
-        if ($file_exists && $overwrite)
-        {
-            // 删除文件
-            \unlink($this->filepath);
-        }
-        if (!$file_exists)
-        {
-            if ($this->isEmpty()) {
-                return $fileSize;
-            }
-
-            if ($data) {
-                return \file_put_contents($this->filepath, $data,FILE_APPEND);
-            }
-            try {
-                $local_file = "{$this->filepath}.{$suffix}";
-                $handle = fopen($local_file, "wb");
-                if (is_resource($handle)) {
-                   /**
-                    * @var $file TransportStreamFile
-                    */
-                   foreach ($this->transportStreamArray as $file) {
-                       if ($file instanceof TransportStreamFile)
-                       {
-                           // 读取已经下载的视频片段
-                           $filepath = $file->getFilePath();
-                           $fileData = \file_get_contents($filepath);
-                           if($this->isEncryptFile()) {
-                             $fileData = $this->decrypt($fileData, $this);
-                           }
-                           $fileSize += \fwrite($handle, $fileData , \filesize($filepath));
-                           // 删除文件
-                           $file->delete();
-//                            $fileSize += \file_put_contents($this->filepath, $rawData = file_get_contents($filepath),FILE_APPEND);
-                       }
-                   }
-               }
-            } finally {
-                if (is_resource($handle)) {
-                    \fclose($handle);
-                }
-            }
-        }
-        return $fileSize;
-    }
-
-    /**
-     * 文件绝对路径
-     * /home/1.mp4
-     * @return string
-     */
-    public function getFilePath() : string
-    {
-        return $this->filepath;
     }
 
     public function exists() :bool
@@ -391,7 +428,8 @@ abstract class FileM3u8 implements \Iterator,\Countable
     public function getFileSizeFormat(): string
     {
         // 读取网络文件大小
-        $fileSize = $this->getFileSize();
+//        $fileSize = $this->getFileSize();
+        $fileSize = $this->getLocalFileSize();
         // 本地文件下载完成，从磁盘读取文件大小
         if ($fileSize === 0 && $this->exists()) {
             $fileSize = \filesize($this->filepath);
@@ -404,25 +442,15 @@ abstract class FileM3u8 implements \Iterator,\Countable
     }
 
     /**
-     * 视频文件字节数
+     * 已下载视屏文件大小
      * @return int
      */
     public function getLocalFileSize() : int
     {
-        $fileSize = 0;
-
-        /**
-         * @var $file TransportStreamFile
-         */
-        foreach ($this->transportStreamArray as $file)
-        {
-            if ($file->exists())
-            {
-                $fileSize += \filesize($file->getFilePath());
-            }
+        if ($this->exists()) {
+            return \filesize($this->filepath);
         }
-
-        return $fileSize;
+        return 0;
     }
 
     public function getFileCount() : int

@@ -46,6 +46,7 @@ class CreateBinaryVideoListener
                         $streamFile->delete();
                     }
                 }
+                $file->setState(FileM3u8::STATE_SUCCESS);
             }
         } finally {
             if (is_resource($handle)) {

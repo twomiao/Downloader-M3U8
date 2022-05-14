@@ -1,0 +1,20 @@
+{
+    "name": "Downloader-M3u8",
+    "version": "3.0",
+    "files": [
+        {
+            "filename": "",
+            "m3u8_url": "",
+            "url_prefix": "",
+            "key": "",
+            "method": ""
+        },
+        {
+            "filename": "",
+            "m3u8_url": "",
+            "url_prefix": "",
+            "key": "",
+            "method": ""
+        }
+    ]
+}
