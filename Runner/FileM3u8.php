@@ -428,8 +428,8 @@ abstract class FileM3u8 implements \Iterator,\Countable
     public function getFileSizeFormat(): string
     {
         // 读取网络文件大小
-//        $fileSize = $this->getFileSize();
-        $fileSize = $this->getLocalFileSize();
+        $fileSize = $this->getFileSize();
+//        $fileSize = $this->getLocalFileSize();
         // 本地文件下载完成，从磁盘读取文件大小
         if ($fileSize === 0 && $this->exists()) {
             $fileSize = \filesize($this->filepath);

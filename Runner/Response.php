@@ -5,8 +5,8 @@ namespace Downloader\Runner;
 
 final class Response
 {
-    private string $body = '';
-    private array $header =  [];
+    private string $body;
+    private array $header;
 
     public function __construct(array $header, string $body)
     {

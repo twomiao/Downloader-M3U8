@@ -103,6 +103,6 @@ class M1906Command extends Command
      */
     protected static function templateFilePath() : string
     {
-        return \getcwd().DIRECTORY_SEPARATOR.'234234'.DIRECTORY_SEPARATOR.FileTemplate::FILENAME;
+        return \getcwd().DIRECTORY_SEPARATOR.'template'.DIRECTORY_SEPARATOR.FileTemplate::FILENAME;
     }
 }
