@@ -85,7 +85,7 @@ Downloader M3U8目录结构：
 }
 ```
 
-#### 加密视频代码,额外实现DecryptFileInterface 解密接口：
+#### 生成解密实例,额外实现DecryptFileInterface 解密接口：
 ```
 <?php
 namespace Downloader\Files\Decrypt;
