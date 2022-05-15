@@ -53,7 +53,7 @@ Downloader M3U8目录结构：
   $> php Downloader.php start
 ```
 
-#### 生成下载模板, 运行命令 php Downloader.php file-tpl：
+#### 生成下载模板, 运行命令 php Downloader.php file-tpl downloader-m3u8.json：
 
 ```
 {
