@@ -2,10 +2,13 @@
 
 namespace Downloader\Command;
 
+use Downloader\Files\Decrypt\M1906DecryptFile;
 use Downloader\Files\M1905File;
+use Downloader\Files\Url\UrlGenerate;
 use Downloader\Runner\Command\FileTemplate;
 use Downloader\Runner\CreateFFmpegVideoListener;
 use Downloader\Runner\CreateVideoFileEvent;
+use Downloader\Runner\FileM3u8;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -57,18 +60,16 @@ class M1906Command extends Command
 
         $downloader  = new Downloader($this->container, $input, $output);
         $downloader->setConcurrencyValue(12);
-        $downloader->setMode(Downloader::MODE_JSON);
         foreach ($files as $jsonFile)
         {
             try
             {
                 // 创建视频为mp4格式
-                $file = new M1905File($jsonFile['m3u8_url'], $jsonFile['put_path']);
+                $file = new FileM3u8($jsonFile['m3u8_url'], $jsonFile['put_path']);
                 $file->saveAs($jsonFile['filename'], $jsonFile['suffix']);
+//                $file->setDecryptFile(new M1906DecryptFile($jsonFile['key'], $jsonFile['method']));
+                $file->setGenerateUrl(new UrlGenerate($jsonFile['url_prefix']));
                 $file->loadJsonFile($jsonFile);
-//                $file->setDecryptCall(function($data, $key,$method) {
-//                    return openssl_decrypt($data, $method, $key, OPENSSL_RAW_DATA);
-//                });
                 // 添加下载文件任务
                 $downloader->addFile($file);
             } catch (\Exception $e) {

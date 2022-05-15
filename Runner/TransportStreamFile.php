@@ -106,16 +106,10 @@ class TransportStreamFile
            return \filesize($this->filePath);
         }
 
-        if (Downloader::isModel(Downloader::MODE_JSON) && $this->fileM3u8->isEncryptFile()) {
-            // 可以进行二次验证
-            $data = $this->fileM3u8->jsonDecrypt(
-                $data,
-                $this->fileM3u8->getJsonFile('key'),
-                $this->fileM3u8->getJsonFile('method'),
-            );
-        } else if ($this->fileM3u8->isEncryptFile()) {
-            $data = $this->fileM3u8->decrypt($data, $this->fileM3u8);
+        if ($this->fileM3u8->isEncryptFile()) {
+            $data = $this->fileM3u8->decryptFile()->decrypt($data, $this);
         }
+
         if (System::writeFile($this->filePath, $data) === false) {
             throw new \RuntimeException('文件保存失败:'.$this->filePath);
         }

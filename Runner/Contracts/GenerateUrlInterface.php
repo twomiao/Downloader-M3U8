@@ -10,5 +10,5 @@ interface GenerateUrlInterface
      * @param TransportStreamFile $file
      * @return string
      */
-    public static function generateUrl(TransportStreamFile $file): string;
+    public function generateUrl(TransportStreamFile $file): string;
 }

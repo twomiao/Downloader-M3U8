@@ -4,21 +4,15 @@ declare(strict_types=1);
 namespace Downloader\Runner;
 
 use Dariuszp\CliProgressBar;
+use Downloader\Files\Url\UrlGenerate;
 use Downloader\Runner\Contracts\DecryptFileInterface;
 use Downloader\Runner\Contracts\GenerateUrlInterface;
 
 /**
- * Class M3u8File
+ * Class FileM3u8
  * @package Downloader\Runner
- * @property string $secretKey;
- * @property string $method;
- * @property ?string $directory;
- * @property string $url;
- * @property int $fileSize;
- * @property string $duration;
- *
  */
-abstract class FileM3u8 implements \Iterator,\Countable
+class FileM3u8 implements \Iterator,\Countable
 {
     /**
      * 下载失败
@@ -121,16 +115,21 @@ abstract class FileM3u8 implements \Iterator,\Countable
     protected array $transportStreamArray = [];
 
     /**
-     * 自定义解密
-     * @var ?\Closure $callDecrypt
-     */
-    protected ?\Closure $callDecrypt = null;
-
-    /**
      * json 文件行信息
      * @var array $file
      */
     protected array $file = [];
+
+    /**
+     * 解密对象
+     * @var DecryptFileInterface|null
+     */
+    protected ?DecryptFileInterface $decryptFile = null;
+
+    /**
+     * @var GenerateUrlInterface|null $generateUrl
+     */
+    protected ?GenerateUrlInterface $generateUrl = null;
 
     /**
      * FileM3u8 constructor.
@@ -196,28 +195,51 @@ abstract class FileM3u8 implements \Iterator,\Countable
         $this->state($state);
     }
 
+    public function setGenerateUrl(GenerateUrlInterface $generateUrl) {
+        $this->generateUrl = $generateUrl;
+    }
+
+    public function generateUrl() : GenerateUrlInterface
+    {
+        if (is_null($this->generateUrl)) {
+            throw new NullPointerException('生成Url实例为空');
+        }
+        return $this->generateUrl;
+    }
+
+    /**
+     * @param DecryptFileInterface $decryptFile
+     */
+    public function setDecryptFile(DecryptFileInterface $decryptFile) {
+        $this->decryptFile = $decryptFile;
+    }
+
+    public function decryptFile() : DecryptFileInterface {
+        return $this->decryptFile;
+    }
+
     /**
      * 加载文件行
-     * @param array $file
+     * @param array $jsonKeys
      * @return void
      */
-    public function loadJsonFile(array $file): void
+    public function loadJsonFile(array $jsonKeys): void
     {
-        $fields = [
-            'filename' => '',
-            'm3u8_url' => '',
-            'url_prefix' => '',
-            'suffix' => 'mp4',
-            'key' => '',
-            'method' => '',
-            'put_path' => '',
-        ];
-        foreach ($file as $field => $value) {
-            if (!array_key_exists($field, $fields)) {
-                throw new \InvalidArgumentException('json key 无效:' . $field);
+        foreach ($jsonKeys as $jsonKey => $jsonValue) {
+            if (array_search($jsonKey, [
+                'filename',
+                'm3u8_url',
+                'url_prefix',
+                'suffix',
+                'key',
+                'method',
+                'put_path',
+                'decrypt_class'
+            ],true) === false) {
+                throw new \InvalidArgumentException('json key 无效:' . $jsonKey);
             }
         }
-        $this->file = $file;
+        $this->file = $jsonKeys;
     }
 
     /**
@@ -228,28 +250,6 @@ abstract class FileM3u8 implements \Iterator,\Countable
     public function getJsonFile(string $key) :string {
         return $this->file[$key] ?? '';
     }
-
-    public function setDecryptCall(\Closure $callDecrypt) : void {
-        $this->callDecrypt = $callDecrypt;
-    }
-
-    /**
-     * 用户自定义解密
-     * @param $data
-     * @param $key
-     * @param $method
-     * @return string
-     */
-    public function jsonDecrypt($data, $key, $method): string
-    {
-        if (!$this->callDecrypt) {
-            throw new \BadMethodCallException(__METHOD__.' 错误方法调用.');
-        }
-        $callDecrypt = $this->callDecrypt;
-
-        return $callDecrypt($data, $key,$method);
-    }
-
 
     public function getStateText() : string
     {
@@ -308,9 +308,6 @@ abstract class FileM3u8 implements \Iterator,\Countable
         // 标记当前状态
         $this->setState(self::STATE_REQUESTING_FILE);
 
-        if (Downloader::isModel(Downloader::MODE_JSON) && empty($this->file)) {
-            throw new \InvalidArgumentException('m3u8 文件为空');
-        }
         /**
          * 文件结构信息
          * @var FileInfoM3u8 $fileInfo
@@ -331,18 +328,9 @@ abstract class FileM3u8 implements \Iterator,\Countable
             $fileUrl  = $tsPath;    // 如果是完整地址
             $file     = new TransportStreamFile($fileUrl, $filename, $duration, $this->absolutePath);
             $file->setFileM3u8($this);
-
-            // 读取json 配置文件模式
-            if(Downloader::isModel(Downloader::MODE_JSON)) {
-                // https://baidu.com/11.ts
-                $fileUrl  = rtrim($this->file['url_prefix'], '\/')
-                    .DIRECTORY_SEPARATOR. $file->getUrl();
-            } elseif  (is_a(static::class,
-                GenerateUrlInterface::class,true)
-            ) {
-                $fileUrl  = static::generateUrl($file);
-            }
-            $file->setUrl($fileUrl);
+            $file->setUrl(
+                $fileUrl = $this->generateUrl()->generateUrl($file)
+            );
             $files[]  = $file;
         }
 
@@ -403,15 +391,8 @@ abstract class FileM3u8 implements \Iterator,\Countable
         return $this->filename;
     }
 
-    public function isEncryptFile():bool {
-        if (is_a(static::class, DecryptFileInterface::class,true)) {
-            return true;
-        } elseif (array_key_exists('key', $this->file) &&
-            array_key_exists('method', $this->file))
-        {
-            return true;
-        }
-        return false;
+    public function isEncryptFile(): bool {
+      return !is_null($this->decryptFile);
     }
 
     protected function isEmpty() :bool

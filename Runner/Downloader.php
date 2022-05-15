@@ -36,27 +36,10 @@ class Downloader
     protected const STATE_QUIT = 3;
 
     /**
-     *
-     * @var string
-     */
-    public const MODE_JSON = 'json_file';
-
-    /**
-     * @var string
-     */
-    public const MODE_ARRAY = 'array';
-
-    /**
      * 当前运行状态
      * @var int $stateCurrent
      */
     protected static int $stateCurrent = self::STATE_STARTING;
-
-    /**
-     * 模式
-     * @var string $mode
-     */
-    protected static string $mode = self::MODE_ARRAY;
 
     /**
      * @var Container $container
@@ -163,21 +146,6 @@ class Downloader
     protected function getConcurrencyValue() : int
     {
         return $this->workerCount;
-    }
-
-    public function setMode(string $mode):void {
-        switch ($mode) {
-            case self::MODE_ARRAY:
-            case self::MODE_JSON:
-                self::$mode = $mode;
-                return;
-        }
-        throw new \InvalidArgumentException("不匹配的模式参数:".$mode);
-    }
-
-    public static function isModel(string $mode):bool
-    {
-        return static::$mode === $mode;
     }
 
     /**

@@ -76,7 +76,8 @@ class FileTemplate extends Command
                 'suffix' => 'mp4',
                 'key' => '',
                 'method' => '',
-                'put_path' => ''
+                'put_path' => '',
+                'decrypt_class' => ''
             ];
         }
         return array_merge($template,$files);

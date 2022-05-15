@@ -1,15 +1,15 @@
 <?php
 declare(strict_types=1);
 namespace Downloader\Runner\Contracts;
-use Downloader\Runner\FileM3u8;
+use Downloader\Runner\TransportStreamFile;
 
 interface DecryptFileInterface
 {
     /**
      * 解密文件
      * @param string $fileData
-     * @param FileM3u8 $fileM3u8
+     * @param TransportStreamFile $transportStreamFile
      * @return string
      */
-    public function decrypt(string $fileData, FileM3u8 $fileM3u8): string;
+    public function decrypt(string $fileData, TransportStreamFile $transportStreamFile): string;
 }

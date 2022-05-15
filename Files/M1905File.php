@@ -21,7 +21,7 @@ final class M1905File extends FileM3u8 implements GenerateUrlInterface
         return dirname($url)."/{$path}";
     }
 
-    public function decrypt(string $fileData, FileM3u8 $fileM3u8): string
+    public function decrypt(string $fileData, TransportStreamFile $transportStreamFile): string
     {
         return openssl_decrypt($fileData, 'aes-128-cbc', '6a1177f9ceedcdcf', OPENSSL_RAW_DATA);
 //        return openssl_decrypt($fileData, 'aes-128-cbc', '6a28df8dbb9eacfd', OPENSSL_RAW_DATA);
