@@ -53,32 +53,139 @@ Downloader M3U8目录结构：
   $> php Downloader.php start
 ```
 
-#### 加密视频代码,额外实现DecryptFileInterface 解密接口：
+#### 生成下载模板, 运行命令 php Downloader.php file-tpl：
+
 ```
-<?php declare(strict_types=1);
-namespace Downloader\Files;
+{
+  "name": "Downloader-M3u8",
+  "version": "3.0",
+  "files": [
+    {
+      "filename": "花与棋",
+      "m3u8_url": "https://m3u8i.vodfile.m1905.com/202205160334/ad0f002d1da17bf8a582c246b3ef29eb/movie/2018/10/25/m201810250GDNYALQQX19HR1P/145502A2CA0ADBA349064BD2E.m3u8",
+      "url_prefix": "https://m3u8i.vodfile.m1905.com/202205160334/ad0f002d1da17bf8a582c246b3ef29eb/movie/2018/10/25/m201810250GDNYALQQX19HR1P",
+      "put_path": "/mnt/c/users/twomiao/desktop/Downloader",
+      "suffix": "mkv"
+    },
+    {
+      "filename": "把妈妈嫁出去",
+      "m3u8_url": "https://m3u8i.vodfile.m1905.com/202205160333/0579c3c3d34210270eb46594f08f4f39/movie/2017/10/11/m20171011INJ4QIAI1GJIZ18D/2C50A79A9292E6D423E015FFE.m3u8",
+      "url_prefix": "https://m3u8i.vodfile.m1905.com/202205160333/0579c3c3d34210270eb46594f08f4f39/movie/2017/10/11/m20171011INJ4QIAI1GJIZ18D",
+      "put_path": "/mnt/c/users/twomiao/desktop/Downloader",
+      "suffix": "mp4"
+    },
+    {
+      "filename": "举起手来",
+      "m3u8_url": "https://m3u8i.vodfile.m1905.com/202205160332/dd304687cf6546cf4baadc1725690777/movie/2014/07/10/m20140710LP24JW3CN8IB86H6/m20140710LP24JW3CN8IB86H6.m3u8",
+      "url_prefix": "https://m3u8i.vodfile.m1905.com/202205160332/dd304687cf6546cf4baadc1725690777/movie/2014/07/10/m20140710LP24JW3CN8IB86H6",
+      "put_path": "/mnt/c/users/twomiao/desktop/Downloader",
+      "suffix": "mkv"
+    }
+  ]
+}
+```
+
+```
+<?php
+namespace Downloader\Files\Decrypt;
 
 use Downloader\Runner\Contracts\DecryptFileInterface;
-use Downloader\Runner\Contracts\GenerateUrlInterface;
-use Downloader\Runner\FileM3u8;
 use Downloader\Runner\TransportStreamFile;
 
-/**
- * @final
- * Class TestFile
- * @package Downloader\Files
- */
-final class TestFile extends FileM3u8 implements GenerateUrlInterface,DecryptFileInterface
+class M1906DecryptFile implements DecryptFileInterface
 {
-    public static function generateUrl(TransportStreamFile $file): string
+    /**
+     * 6a1177f9ceedcdcf
+     * @var string $key
+     */
+    private string $key;
+
+    /**
+     * aes-128-cbc
+     * @var string $method
+     */
+    private string $method;
+
+    /**
+     * 初始化完成
+     * M1906 constructor.
+     * @param string $key
+     * @param string $method
+     */
+    public function __construct(string $key, string $method)
     {
-        $path = $file->getUrl();
-        return "https://xx.com/{$path}";
+        $this->key = $key;
+        $this->method = $method;
     }
 
-    public function decrypt(string $fileData, FileM3u8 $fileM3u8): string
+    public function decrypt(string $fileData, TransportStreamFile $transportStreamFile): string
     {
-        return openssl_decrypt($fileData, 'aes-128-cbc', '9d2d4fcf98fb99aa', OPENSSL_RAW_DATA);
+        return openssl_decrypt($fileData, $this->method, $this->key, OPENSSL_RAW_DATA);
+    }
+}
+```
+
+#### 加密视频代码,额外实现DecryptFileInterface 解密接口：
+```
+<?php
+namespace Downloader\Files\Decrypt;
+
+use Downloader\Runner\Contracts\DecryptFileInterface;
+use Downloader\Runner\TransportStreamFile;
+
+class M1906DecryptFile implements DecryptFileInterface
+{
+    /**
+     * 6a1177f9ceedcdcf
+     * @var string $key
+     */
+    private string $key;
+
+    /**
+     * aes-128-cbc
+     * @var string $method
+     */
+    private string $method;
+
+    /**
+     * 初始化完成
+     * M1906 constructor.
+     * @param string $key
+     * @param string $method
+     */
+    public function __construct(string $key, string $method)
+    {
+        $this->key = $key;
+        $this->method = $method;
+    }
+
+    public function decrypt(string $fileData, TransportStreamFile $transportStreamFile): string
+    {
+        return openssl_decrypt($fileData, $this->method, $this->key, OPENSSL_RAW_DATA);
+    }
+}
+```
+
+#### 生成Url实例,额外实现GenerateUrlInterface接口：
+```
+<?php
+namespace Downloader\Files\Url;
+
+use Downloader\Runner\Contracts\GenerateUrlInterface;
+use Downloader\Runner\TransportStreamFile;
+
+class UrlGenerate implements GenerateUrlInterface
+{
+    private string $url;
+
+    public function __construct(string $url)
+    {
+        $this->url = $url;
+    }
+
+    public function generateUrl(TransportStreamFile $file): string
+    {
+        return ltrim($this->url, '\/').'/'.$file->getUrl();
     }
 }
 ```
@@ -114,10 +221,13 @@ run(function () {
 
 namespace Downloader\Command;
 
+use Downloader\Files\Decrypt\M1906DecryptFile;
 use Downloader\Files\M1905File;
+use Downloader\Files\Url\UrlGenerate;
 use Downloader\Runner\Command\FileTemplate;
 use Downloader\Runner\CreateFFmpegVideoListener;
 use Downloader\Runner\CreateVideoFileEvent;
+use Downloader\Runner\FileM3u8;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -168,19 +278,17 @@ class M1906Command extends Command
        $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateFFmpegVideoListener::METHOD_NAME]);
 
         $downloader  = new Downloader($this->container, $input, $output);
-        $downloader->setConcurrencyValue(30);
-        $downloader->setMode(Downloader::MODE_JSON);
+        $downloader->setConcurrencyValue(12);
         foreach ($files as $jsonFile)
         {
             try
             {
                 // 创建视频为mp4格式
-                $file = new M1905File($jsonFile['m3u8_url'], $jsonFile['put_path']);
+                $file = new FileM3u8($jsonFile['m3u8_url'], $jsonFile['put_path']);
                 $file->saveAs($jsonFile['filename'], $jsonFile['suffix']);
+//                $file->setDecryptFile(new M1906DecryptFile($jsonFile['key'], $jsonFile['method']));
+                $file->setGenerateUrl(new UrlGenerate($jsonFile['url_prefix']));
                 $file->loadJsonFile($jsonFile);
-//                $file->setDecryptCall(function($data, $key,$method) {
-//                    return openssl_decrypt($data, $method, $key, OPENSSL_RAW_DATA);
-//                });
                 // 添加下载文件任务
                 $downloader->addFile($file);
             } catch (\Exception $e) {
@@ -215,7 +323,7 @@ class M1906Command extends Command
      */
     protected static function templateFilePath() : string
     {
-        return \getcwd().DIRECTORY_SEPARATOR.'234234'.DIRECTORY_SEPARATOR.FileTemplate::FILENAME;
+        return \getcwd().DIRECTORY_SEPARATOR.'template'.DIRECTORY_SEPARATOR.FileTemplate::FILENAME;
     }
 }
 ```
