@@ -11,16 +11,9 @@ use Downloader\Runner\TransportStreamFile;
  * Class TestFile
  * @package Downloader\Files
  */
-//final class M1905File extends FileM3u8 implements GenerateUrlInterface,DecryptFileInterface
-final class M1905File extends FileM3u8 implements GenerateUrlInterface
+final class M1905File extends FileM3u8
+//    implements DecryptFileInterface
 {
-    public static function generateUrl(TransportStreamFile $file): string
-    {
-        $path = $file->getUrl();
-        $url  = $file->getFileM3u8()->getUrl();
-        return dirname($url)."/{$path}";
-    }
-
     public function decrypt(string $fileData, TransportStreamFile $transportStreamFile): string
     {
         return openssl_decrypt($fileData, 'aes-128-cbc', '6a1177f9ceedcdcf', OPENSSL_RAW_DATA);

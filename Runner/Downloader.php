@@ -79,13 +79,13 @@ class Downloader
      | 协程池
      | ----------------------------------------
      | 并发数量       $workerCount
-     | 队列大小       $queueSize
+     | 队列大小       $queueLength
      | 任务队列       $queueMaxSizeChannel
      | 挂起全部协程    $waitGroup
      | 退出消费者协程  $hasQuit
      -----------------------------------------*/
-    public int $queueSize      = 90;
-    protected int $workerCount = 30;
+    public int $queueLength    = 90;
+    protected int $workerCount = 8;
     protected Channel $queueChannel;
     protected WaitGroup $waitGroup;
     protected Channel $quitProgram;
@@ -101,9 +101,7 @@ class Downloader
     public function __construct(Container $container, InputInterface $input, OutputInterface $output)
     {
         // 协程数量
-        $this->workerCount = $this->getConcurrencyValue();
-        // 队列任务
-        $this->queueChannel = new Channel($this->getQueueValue());
+        $this->workerCount = $this->getWorkerCount();
         // 退出程序
         $this->quitProgram = new Channel(1);
         // 阻塞进程
@@ -124,6 +122,9 @@ class Downloader
      * @param int $timeout
      */
     public function setTimeout(int $timeout) : void {
+        if (static::$stateCurrent === self::STATE_RUNNING) {
+            return;
+        }
         // 超时时间超过1小时，
         if ($timeout < -1 && $timeout > 3600) {
             $timeout = 120;
@@ -132,37 +133,47 @@ class Downloader
     }
 
     /**
-     * 设置最大并发数量
-     * @param int $value
+     * 最大并发请求数量
+     * @param int $requests
      */
-    public function setConcurrencyValue(int $value = 0) : void
+    public function setConcurrentRequestsNumber(int $requests = 8) : void
     {
-        if ($value < 5 || $value > 3000) {
-            $value = 30;
+        if (static::$stateCurrent === self::STATE_RUNNING) {
+            return;
         }
-        $this->workerCount = $value;
+
+        if ($requests < 1 || $requests > 10000) {
+            $requests = 8;
+        }
+        $this->workerCount = $requests;
     }
 
-    protected function getConcurrencyValue() : int
+    protected function getWorkerCount() : int
     {
         return $this->workerCount;
     }
 
     /**
-     * 设置队列大小
+     * 最大并发数量限制
      * @param int setQueueValue
      */
-    public function setQueueValue(int $value = 0) : void
+    public function setQueueLength(int $length = 0) : void
     {
-        if ($value < 80 || $value > 3000) {
-            $value = $this->workerCount * 4;
+        if (static::$stateCurrent === self::STATE_RUNNING) {
+            return;
         }
-        $this->queueSize = $value;
+
+        if ($length === 0 || $length < 1 ||
+            $length <= $this->workerCount) {
+            $length = $this->workerCount * 2;
+        }
+
+        $this->queueLength = $length;
     }
 
-    protected function getQueueValue() : int
+    protected function getQueueLength() : int
     {
-        return $this->queueSize;
+        return $this->queueLength;
     }
 
     public function addFile(FileM3u8 $file) : void
@@ -322,14 +333,14 @@ class Downloader
 
         // 安装信号处理器
         $this->installSignal();
-        // 写入文件队列，进行下载文件任务
-        $this->makeProducers();
+        // 投递文件到协程通道
+        $this->dropOffDocuments();
         // 管控进程
         $this->monitorWorkerPool();
         // 协程挂起
         $this->waitGroup->wait();
-        // 开启协程加速生成视频
-        $this->touchVideoFile();
+        // 创建本地视频文件
+        $this->createFileVideo();
         // 统计下载结
         $this->downloadResults();
         // 输出下载时间
@@ -351,13 +362,15 @@ class Downloader
         });
     }
 
-    protected function makeProducers()
+    protected function dropOffDocuments()
     {
-        $m3u8Files = $this->files();
+        // 队列任务
+        $this->queueChannel = new Channel($this->getQueueLength());
+
         /**
          * @var FileM3u8 $m3u8File
          */
-        foreach ($m3u8Files as $m3u8File)
+        foreach ($this->files() as $m3u8File)
         {
             // 失败不进行下载
             if ($m3u8File->getState() === FileM3u8::STATE_FAIL) {
@@ -370,7 +383,7 @@ class Downloader
             }
             $this->waitGroup->add();
             Coroutine::create(function()use($m3u8File) {
-                Coroutine::defer(fn() => $this->waitGroup->done());
+                Coroutine::defer( fn()=> $this->waitGroup->done() );
                 /**
                  * @var TransportStreamFile $tsFile
                  */
@@ -379,6 +392,7 @@ class Downloader
                     if($this->flag) {
                         return;
                     }
+
                     if ($tsFile->exists()) {
                         $tsFile->setState(TransportStreamFile::STATE_SUCCESS);
                         $m3u8File->cliProgressBar->addCurrentStep(1);
@@ -464,6 +478,7 @@ class Downloader
                 $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
                 static::$container['logger']->error(__METHOD__." -> {$transportStreamFile->getUrl()} info:{$e->getMessage()}, code: {$e->getCode()}.");
             } finally {
+                // 网络请求失败,记录下载失败
                 $transportStreamFile->getFileM3u8()
                     ->setState(
                 is_null($e) ? FileM3u8::STATE_SUCCESS : FileM3u8::STATE_FAIL
@@ -473,7 +488,7 @@ class Downloader
         return false;
     }
 
-    protected function touchVideoFile() {
+    protected function createFileVideo() {
         $waitGroup = null;
 
         if($this->flag) {
@@ -493,32 +508,35 @@ class Downloader
                 $file->setState(FileM3u8::STATE_SUCCESS);
                 continue;
             }
-            //  文件下载完成,开始合并
-            if ($file->cliProgressBar->getSteps() === $file->cliProgressBar->getCurrentStep()) {
-                if (is_null($waitGroup)) {
-                    $waitGroup = new WaitGroup();
-                }
-                $waitGroup->add();
-                Coroutine::create(function() use($file,$waitGroup) {
-                    Coroutine::defer(fn()=>$waitGroup->done());
-                    try
-                    {
-                        /**
-                         * @var $dispatcher EventDispatcher
-                         */
-                        $dispatcher = self::$container['dispatcher'];
-                        // 事件为空，添加默认处理器[二进制]
-                        if (!$dispatcher->hasListeners(CreateVideoFileEvent::NAME)) {
-                            $dispatcher->addListener(CreateVideoFileEvent::NAME, [new CreateBinaryVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);
-                        }
-                        // 视频转换合并
-                        $dispatcher->dispatch(new CreateVideoFileEvent($file), CreateVideoFileEvent::NAME);
-                    } catch (\Exception | \Error $e) {
-                        // 写入日志文件
-                        static::$container['logger']->error(__METHOD__.":异常日志:{$e->getMessage()}, 错误代码: {$e->getCode()}.");
-                    }
-                });
+            if ($file->cliProgressBar->getSteps() !== $file->cliProgressBar->getCurrentStep()) {
+                $file->setState(FileM3u8::STATE_FAIL);
+                 continue;
             }
+            //  文件下载完成,开始合并
+            if (is_null($waitGroup)) {
+                $waitGroup = new WaitGroup();
+            }
+
+            $waitGroup->add();
+            Coroutine::create(function() use($file,$waitGroup) {
+                Coroutine::defer(fn()=>$waitGroup->done());
+                try
+                {
+                    /**
+                     * @var $dispatcher EventDispatcher
+                     */
+                    $dispatcher = self::$container['dispatcher'];
+                    // 事件为空，添加默认处理器[二进制]
+                    if (!$dispatcher->hasListeners(CreateVideoFileEvent::NAME)) {
+                        $dispatcher->addListener(CreateVideoFileEvent::NAME, [new CreateBinaryVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);
+                    }
+                    // 视频转换合并
+                    $dispatcher->dispatch(new CreateVideoFileEvent($file), CreateVideoFileEvent::NAME);
+                } catch (\Exception | \Error $e) {
+                    // 写入日志文件
+                    static::$container['logger']->error(__METHOD__.":异常日志:{$e->getMessage()}, 错误代码: {$e->getCode()}.");
+                }
+            });
         }
         if (!is_null($waitGroup)) {
             $waitGroup->wait();
@@ -539,6 +557,7 @@ class Downloader
             $info['id']           = ++$id;
             $info['filename']     = $file->getFilename();
             $info['count']        = \count($file);
+            $info['local']        = $file->cliProgressBar->getCurrentStep();
             $info['now']          = $file->getPlaySecondFormat();
             $info['save_path']    = \realpath($file->getFilePath());
             $info['filesize']     = $file->getFileSizeFormat();
@@ -547,7 +566,7 @@ class Downloader
             $result[] = $info;
         }
         $fileTable = new Table($output);
-        $fileTable->setHeaders(['ID', '视频名','分片数', '播放时长', '保存位置', '文件大小', '下载状态',  '网络地址']);
+        $fileTable->setHeaders(['ID', '视频名','任务数量', '本地数量', '播放时长', '保存位置', '文件大小', '下载状态',  '网络地址']);
         $fileTable->setRows($result);
         $fileTable->render();
     }

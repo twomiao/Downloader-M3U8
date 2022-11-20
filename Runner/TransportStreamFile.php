@@ -163,7 +163,7 @@ class TransportStreamFile
 
     public function delete() :bool
     {
-        return $this->exists() && unlink($this->filePath);
+        return @unlink($this->filePath);
     }
 
     public function exists() :bool

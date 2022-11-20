@@ -59,16 +59,18 @@ class M1906Command extends Command
        $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateFFmpegVideoListener::METHOD_NAME]);
 
         $downloader  = new Downloader($this->container, $input, $output);
-        $downloader->setConcurrencyValue(12);
+        $downloader->setConcurrentRequestsNumber(20);
         foreach ($files as $jsonFile)
         {
             try
             {
                 // 创建视频为mp4格式
-                $file = new FileM3u8($jsonFile['m3u8_url'], $jsonFile['put_path']);
+                $save_video = $jsonFile['put_path'] . DIRECTORY_SEPARATOR. $jsonFile['filename'];
+                $file = new FileM3u8($jsonFile['m3u8_url'], $save_video);
                 $file->saveAs($jsonFile['filename'], $jsonFile['suffix']);
 //                $file->setDecryptFile(new M1906DecryptFile($jsonFile['key'], $jsonFile['method']));
-                $file->setGenerateUrl(new UrlGenerate($jsonFile['url_prefix']));
+                $url_prefix = $jsonFile['url_prefix'] ?: dirname($jsonFile['m3u8_url']);
+                $file->setGenerateUrl(new UrlGenerate($url_prefix));
                 $file->loadJsonFile($jsonFile);
                 // 添加下载文件任务
                 $downloader->addFile($file);

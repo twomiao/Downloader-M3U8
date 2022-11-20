@@ -43,9 +43,6 @@ class CreateFFmpegVideoListener
      * @return bool
      */
     protected function deleteFiles(FileM3u8 $fileM3u8) : bool {
-        if (is_null($fileM3u8)) {
-            return false;
-        }
         foreach ($fileM3u8 as $file) {
             if ($file instanceof TransportStreamFile) {
                 if (!$file->delete()) {

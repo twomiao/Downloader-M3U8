@@ -255,7 +255,7 @@ class FileM3u8 implements \Iterator,\Countable
     {
         switch ($this->state) {
             case self::STATE_FAIL:
-                return '失败';
+                return '<error>失败</error>';
             case self::STATE_REQUESTING_FILE:
                 return '请求文件中';
             case self::STATE_REQUEST_SUCCESS:
@@ -265,7 +265,7 @@ class FileM3u8 implements \Iterator,\Countable
             case self::STATE_REQUEST_WAIT:
                 return '等待文件请求';
             case self::STATE_SUCCESS:
-                return '下载完成';
+                return '<info>下载完成</info>';
         }
         return '未定义';
     }
@@ -328,10 +328,13 @@ class FileM3u8 implements \Iterator,\Countable
             $fileUrl  = $tsPath;    // 如果是完整地址
             $file     = new TransportStreamFile($fileUrl, $filename, $duration, $this->absolutePath);
             $file->setFileM3u8($this);
-            $file->setUrl(
-                $fileUrl = $this->generateUrl()->generateUrl($file)
-            );
-            $files[]  = $file;
+            if ($downloadUrl = $this->generateUrl()->generateUrl($file))
+            {
+                $file->setUrl(
+                    $downloadUrl
+                );
+                array_push($files, $file);
+            }
         }
 
         return $files;
@@ -507,7 +510,7 @@ class FileM3u8 implements \Iterator,\Countable
 
     public function valid()
     {
-        return \key($this->transportStreamArray) !== null;
+        return  \key($this->transportStreamArray) !== null;
     }
 
     public function rewind()

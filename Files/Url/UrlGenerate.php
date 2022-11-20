@@ -15,6 +15,10 @@ class UrlGenerate implements GenerateUrlInterface
 
     public function generateUrl(TransportStreamFile $file): string
     {
+        if ($file->getUrl() === "/headers/header.ts")
+        {
+            return "";
+        }
         return ltrim($this->url, '\/').'/'.$file->getUrl();
     }
 }
