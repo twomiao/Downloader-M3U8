@@ -324,7 +324,7 @@ class Downloader
             return;
         } finally {
             $this->terminal->print(
-                sprintf("搜索网络文件结束，成功:[%d]个,失败:[%d]个\n",
+                sprintf("搜索网络文件结束，成功:[%d]个,失败:[%d]个",
                     $this->fileFinCount(),
                     $this->fileFailCount()
                 )
@@ -376,6 +376,7 @@ class Downloader
             if ($m3u8File->getState() === FileM3u8::STATE_FAIL) {
                 continue;
             }
+
             if ($m3u8File->exists()) {
                 $m3u8File->cliProgressBar->addCurrentStep($m3u8File->count());
                 $m3u8File->setState(FileM3u8::STATE_SUCCESS);
@@ -448,6 +449,7 @@ class Downloader
     protected function downloadTsFragment(TransportStreamFile $transportStreamFile, int $retry, int $timeout) : bool
     {
         $e = null;
+
         while($retry-- > 0) {
             try
             {
@@ -476,7 +478,9 @@ class Downloader
             } catch (\Exception | \Error $e) {
                 // 下载失败,记录日志
                 $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
-                static::$container['logger']->error(__METHOD__." -> {$transportStreamFile->getUrl()} info:{$e->getMessage()}, code: {$e->getCode()}.");
+                if ($retry === 0) {
+                    static::$container['logger']->error(__METHOD__."-> {$transportStreamFile->getUrl()} info:{$e->getMessage()}, code: {$e->getCode()}.");
+                }
             } finally {
                 // 网络请求失败,记录下载失败
                 $transportStreamFile->getFileM3u8()
@@ -559,14 +563,13 @@ class Downloader
             $info['count']        = \count($file);
             $info['local']        = $file->cliProgressBar->getCurrentStep();
             $info['now']          = $file->getPlaySecondFormat();
-            $info['save_path']    = \realpath($file->getFilePath());
+//            $info['save_path']    = \realpath($file->getRealFilename());
             $info['filesize']     = $file->getFileSizeFormat();
             $info['status']       = $file->getStateText();
-            $info['download_url'] = $file->getUrl();
             $result[] = $info;
         }
         $fileTable = new Table($output);
-        $fileTable->setHeaders(['ID', '视频名','任务数量', '本地数量', '播放时长', '保存位置', '文件大小', '下载状态',  '网络地址']);
+        $fileTable->setHeaders(['ID', '视频名','任务数量', '本地数量', '播放时长', '文件大小', '下载状态']);
         $fileTable->setRows($result);
         $fileTable->render();
     }
