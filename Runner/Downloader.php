@@ -478,8 +478,11 @@ class Downloader
             } catch (\Exception | \Error $e) {
                 // 下载失败,记录日志
                 $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
-                static::$container['logger']
-                    ->error(__METHOD__."-> {$transportStreamFile->getUrl()} 程序异常: {$e}");
+                if ($retry === 0)
+                {
+                    static::$container['logger']
+                        ->error(__METHOD__."-> {$transportStreamFile->getUrl()} 程序异常: {$e}");
+                }
             } finally {
                 // 网络请求失败,记录下载失败
                 $transportStreamFile->getFileM3u8()

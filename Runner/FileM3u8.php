@@ -147,38 +147,34 @@ class FileM3u8 implements \Iterator,\Countable
      * FileM3u8 constructor.
      * @param string $url
      * @param string $absolutePath
+     * @param string $filename
      * @throws \Exception
      */
-    public function __construct(string $url, string $absolutePath)
+    public function __construct(string $url, string $filename, string $absolutePath)
     {
         $this->url = $url;
         // 文件存储路径
         $this->absolutePath = $absolutePath;
+        $this->tempFilename = md5($filename);
+        $this->filename     = $filename;
         // 临时存储路径
-        $this->tempFilePath = sys_get_temp_dir() .DIRECTORY_SEPARATOR . Downloader::PROGRAM_NAME;
+        $this->tempFilePath = sys_get_temp_dir() .DIRECTORY_SEPARATOR .
+            Downloader::PROGRAM_NAME .DIRECTORY_SEPARATOR. $this->tempFilename;
         // 绘制命令行进度条
         $this->cliProgressBar = new CliProgressBar(100, 0);
-    }
-
-    /**
-     * @param string $filename
-     * @param string $suffix
-     * @param int $permissions
-     * @throws \Exception
-     */
-    public function saveAs(string $filename, string $suffix, $permissions = 0777): void
-    {
-        // 文件全路径 /home/1.mp4
-        $this->filename = $filename;
-        $this->tempFilename = md5($filename);
-        $this->suffix = $suffix;
-        // 临时文件存储位置
-        $this->tempFilePath = $this->tempFilePath .
-            DIRECTORY_SEPARATOR. $this->tempFilename;
         // 实际文件存储位置
         $this->realFilename = rtrim($this->absolutePath, '\/');
-        static::mkdir($this->realFilename, $permissions);
+
+        static::mkdir($this->realFilename, 0777);
         static::mkdir($this->tempFilePath, 0777);
+    }
+
+    public function setSuffix(string $suffix) : void {
+        $this->suffix = $suffix;
+    }
+
+    public function getSuffix() : string {
+        return $this->suffix;
     }
 
     /**
@@ -190,7 +186,19 @@ class FileM3u8 implements \Iterator,\Countable
         if (empty($this->tempFilePath)) {
             throw new \BadMethodCallException("临时文件另存为路径不存在.");
         }
-        return $this->tempFilePath.DIRECTORY_SEPARATOR.$this->tempFilename.".{$this->suffix}";
+        return $this->tempFilePath.DIRECTORY_SEPARATOR.".{$this->getSuffix()}";
+    }
+
+    /**
+     * 临时文件路径
+     * @return string
+     */
+    public function getTempDir(): string
+    {
+        if (empty($this->tempFilePath)) {
+            throw new \BadMethodCallException("临时文件另存为路径不存在.");
+        }
+        return $this->tempFilePath.DIRECTORY_SEPARATOR;
     }
 
     /**
@@ -202,7 +210,7 @@ class FileM3u8 implements \Iterator,\Countable
         if (empty($this->realFilename)) {
             throw new \BadMethodCallException("临时文件另存为路径不存在.");
         }
-        return $this->realFilename.DIRECTORY_SEPARATOR.$this->filename.".{$this->suffix}";
+        return $this->realFilename.DIRECTORY_SEPARATOR.$this->filename.".{$this->getSuffix()}";
     }
 
     /**
@@ -364,7 +372,7 @@ class FileM3u8 implements \Iterator,\Countable
             $duration = floatval($timeArray[$idx]); // 每片段时间
             $filename = pathinfo($tsPath, PATHINFO_FILENAME); // 文件名称
             $fileUrl  = $tsPath;    // 如果是完整地址
-            $file     = new TransportStreamFile($fileUrl, $filename, $duration, $tempPath);
+            $file     = new TransportStreamFile($fileUrl, $filename, $duration, $this->getTempDir());
             $file->setFileM3u8($this);
             if ($downloadUrl = $this->generateUrl()->generateUrl($file))
             {

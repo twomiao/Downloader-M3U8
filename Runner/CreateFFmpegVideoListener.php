@@ -11,8 +11,9 @@ class CreateFFmpegVideoListener
         $file = $event->getFileM3u8();
 //        $suffix = $event->getSuffix();
         // 本地临时文件名称
-        $tempFile = "{$file->getTempFilePath()}";
-        $realFile = "{$file->getRealFilename()}";
+        $tempFile = $file->getTempFilePath();
+        $realFile = $file->getRealFilename();
+        $tempDir  = $file->getTempDir();
 
         $ffmpegTextFile = \dirname($file->getTempFilePath()). '/'.$file->getTempFilename().'.txt';
 
@@ -35,8 +36,7 @@ class CreateFFmpegVideoListener
         \rename($tempFile, $realFile);
         print date('Y-m-d H:i:s'). " >正在删除[{$realFile}]的分片文件 .....".PHP_EOL;
         $this->deleteFiles($file);
-        $temp_dir = \dirname($tempFile);
-        is_dir($temp_dir) && \rmdir($temp_dir);
+        is_dir($tempDir) && \rmdir($tempDir);
         print date('Y-m-d H:i:s'). " >已生成视频文件: {$realFile}.".PHP_EOL;
         $file->setState(FileM3u8::STATE_SUCCESS);
     }

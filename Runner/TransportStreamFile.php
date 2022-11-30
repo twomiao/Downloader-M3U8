@@ -56,14 +56,14 @@ class TransportStreamFile
      * @param string $url
      * @param string $filename
      * @param float $duration
-     * @param string $absolutePath
+     * @param string $tempDir
      */
-    public function __construct(string $url, string $filename, float $duration, string $absolutePath)
+    public function __construct(string $url, string $filename, float $duration, string $tempDir)
     {
         $this->url = $url;
         $suffix = \strripos(\trim($filename),'.ts') === false ? 'ts' : '';
         $this->filename = \trim($filename).".{$suffix}";
-        $this->filePath = rtrim($absolutePath,'\/'). DIRECTORY_SEPARATOR.$this->filename;
+        $this->filePath = rtrim($tempDir,'\/'). DIRECTORY_SEPARATOR.$this->filename;
         $this->duration = $duration;
         \restore_error_handler();
     }
