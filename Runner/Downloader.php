@@ -478,9 +478,8 @@ class Downloader
             } catch (\Exception | \Error $e) {
                 // 下载失败,记录日志
                 $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
-                if ($retry === 0) {
-                    static::$container['logger']->error(__METHOD__."-> {$transportStreamFile->getUrl()} info:{$e->getMessage()}, code: {$e->getCode()}.");
-                }
+                static::$container['logger']
+                    ->error(__METHOD__."-> {$transportStreamFile->getUrl()} 程序异常: {$e}");
             } finally {
                 // 网络请求失败,记录下载失败
                 $transportStreamFile->getFileM3u8()
@@ -532,7 +531,11 @@ class Downloader
                     $dispatcher = self::$container['dispatcher'];
                     // 事件为空，添加默认处理器[二进制]
                     if (!$dispatcher->hasListeners(CreateVideoFileEvent::NAME)) {
-                        $dispatcher->addListener(CreateVideoFileEvent::NAME, [new CreateBinaryVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);
+                        $dispatcher->addListener(CreateVideoFileEvent::NAME,
+                            [
+                                new CreateBinaryVideoListener(), CreateBinaryVideoListener::METHOD_NAME
+                            ]
+                        );
                     }
                     // 视频转换合并
                     $dispatcher->dispatch(new CreateVideoFileEvent($file), CreateVideoFileEvent::NAME);
