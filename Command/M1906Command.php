@@ -66,8 +66,8 @@ class M1906Command extends Command
             {
                 // 创建视频为mp4格式
                 $save_video = $jsonFile['put_path'] . DIRECTORY_SEPARATOR. $jsonFile['filename'];
-                $file = new FileM3u8($jsonFile['m3u8_url'], $save_video);
-                $file->saveAs($jsonFile['filename'], $jsonFile['suffix']);
+                $file = new FileM3u8($jsonFile['m3u8_url'], $jsonFile['filename'], $save_video);
+                $file->setSuffix($jsonFile['suffix']);
 //                $file->setDecryptFile(new M1906DecryptFile($jsonFile['key'], $jsonFile['method']));
                 $url_prefix = $jsonFile['url_prefix'] ?: dirname($jsonFile['m3u8_url']);
                 $file->setGenerateUrl(new UrlGenerate($url_prefix));
