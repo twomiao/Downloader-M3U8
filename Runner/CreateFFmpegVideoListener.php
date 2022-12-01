@@ -11,11 +11,11 @@ class CreateFFmpegVideoListener
         $file = $event->getFileM3u8();
 //        $suffix = $event->getSuffix();
         // 本地临时文件名称
-        $tempFile = $file->getTempFilePath();
         $realFile = $file->getRealFilename();
         $tempDir  = $file->getTempDir();
 
         $ffmpegTextFile = \dirname($file->getTempFilePath()). '/'.$file->getTempFilename().'.txt';
+        $tempFile       = $file->getTempFilePath();
 
         print PHP_EOL;
 //        print date('Y-m-d H:i:s'). " >正在生成[FFMPEG 命令]文件: {$ffmpegTextFile}.".PHP_EOL;
@@ -23,7 +23,8 @@ class CreateFFmpegVideoListener
         if ( !$success = self::ffmpegFilePath($file, $ffmpegTextFile ) ) {
             throw new \Exception("FFMPEG命令生成失败: {$file->getTempFilePath()}.");
         }
-        $command = "/usr/bin/ffmpeg -f concat -safe 0 -i {$ffmpegTextFile}  -c copy  {$tempFile} >/dev/null 2>&1";
+//        $command = "/usr/bin/ffmpeg -f concat -safe 0 -i {$ffmpegTextFile}  -c copy  {$tempFile} >/dev/null 2>&1";
+        $command = "/usr/bin/ffmpeg -f concat -safe 0 -i {$ffmpegTextFile}  -c copy  {$tempFile}";
 //        $command = "/usr/bin/ffmpeg -f concat -safe 0 -i {$ffmpegTextFile}  -c copy  {$filename}";
         print date('Y-m-d H:i:s'). " >正在执行FFMPEG命令, 创建视频文件: {$realFile}.\n";
         try {

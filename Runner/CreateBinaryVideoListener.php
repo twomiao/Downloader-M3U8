@@ -21,7 +21,7 @@ class CreateBinaryVideoListener
         try {
 //            $suffix = $event->getSuffix();
 
-            $local_file = "{$file->getFilePath()}";
+            $local_file = "{$file->getRealFilename()}";
             $handle = fopen($local_file, "wb");
             if (is_resource($handle)) {
                 /**

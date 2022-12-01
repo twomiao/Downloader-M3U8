@@ -186,7 +186,7 @@ class FileM3u8 implements \Iterator,\Countable
         if (empty($this->tempFilePath)) {
             throw new \BadMethodCallException("临时文件另存为路径不存在.");
         }
-        return $this->tempFilePath.DIRECTORY_SEPARATOR.".{$this->getSuffix()}";
+        return $this->tempFilePath.DIRECTORY_SEPARATOR."{$this->tempFilename}.{$this->getSuffix()}";
     }
 
     /**
