@@ -26,7 +26,7 @@ class M1906DecryptFile implements DecryptFileInterface
      */
     public function __construct(string $key, string $method)
     {
-        $this->key = $key;
+        $this->key = file_get_contents($key);
         $this->method = $method;
     }
 

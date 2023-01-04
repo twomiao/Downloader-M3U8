@@ -6,6 +6,7 @@ use Downloader\Files\Decrypt\M1906DecryptFile;
 use Downloader\Files\M1905File;
 use Downloader\Files\Url\UrlGenerate;
 use Downloader\Runner\Command\FileTemplate;
+use Downloader\Runner\CreateBinaryVideoListener;
 use Downloader\Runner\CreateFFmpegVideoListener;
 use Downloader\Runner\CreateVideoFileEvent;
 use Downloader\Runner\FileM3u8;
@@ -56,7 +57,8 @@ class M1906Command extends Command
         //    此监听器必须安装FFMPEG 程序，才可以正常使用 [推荐的方式]
         // 3. 默认使用 [二进制文件格式] 创建视频文件
         // 4. 用户自行安装FFMPEG 程序，直接把下面这段注释去掉，自动改为FFMPEG 生成视频文件格式
-       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateFFmpegVideoListener::METHOD_NAME]);
+//       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateFFmpegVideoListener(), CreateFFmpegVideoListener::METHOD_NAME]);;
+//       $this->container['dispatcher']->addListener(CreateVideoFileEvent::NAME, [new CreateBinaryVideoListener(), CreateBinaryVideoListener::METHOD_NAME]);;
 
         $downloader  = new Downloader($this->container, $input, $output);
         $downloader->setConcurrentRequestsNumber(20);
@@ -68,7 +70,7 @@ class M1906Command extends Command
                 $save_video = $jsonFile['put_path'] . DIRECTORY_SEPARATOR. $jsonFile['filename'];
                 $file = new FileM3u8($jsonFile['m3u8_url'], $jsonFile['filename'], $save_video);
                 $file->setSuffix($jsonFile['suffix']);
-//                $file->setDecryptFile(new M1906DecryptFile($jsonFile['key'], $jsonFile['method']));
+                $file->setDecryptFile(new M1906DecryptFile($jsonFile['key'], $jsonFile['method']));
                 $url_prefix = $jsonFile['url_prefix'] ?: dirname($jsonFile['m3u8_url']);
                 $file->setGenerateUrl(new UrlGenerate($url_prefix));
                 $file->loadJsonFile($jsonFile);

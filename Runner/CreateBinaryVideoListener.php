@@ -37,9 +37,9 @@ class CreateBinaryVideoListener
                         if ($fileData === false)  {
                             throw new \Exception(swoole_strerror(swoole_last_error(), 9), swoole_last_error());
                         }
-                        if($file->isEncryptFile()) {
-                            $fileData = $file->decrypt($fileData, $file);
-                        }
+//                        if($file->isEncryptFile()) {
+//                            $fileData = $file->decryptFile()->decrypt($fileData, $streamFile);
+//                        }
                         \fwrite($handle, $fileData, \strlen($fileData));
                         \fflush($handle);
                         // 删除文件
