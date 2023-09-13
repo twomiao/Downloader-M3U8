@@ -231,7 +231,8 @@ class Downloader
                 $fileSliceCount,
                 $file->taskFinished->succeedNum,
                 $file->taskFinished->errors,
-                $file->taskFinished->errors === 0 ? "<info>『成功』</info>":"<error>『失败』</error>"
+                $file->taskFinished->flag === TaskFinished::FLAG_SAVE_FILE_SUCCEED ?
+                 "<info>『成功』</info>":"<error>『失败』</error>"
             );
         }
         return $res;
@@ -474,7 +475,7 @@ class Downloader
             if (static::runStatus() === static::STATUS_RUNNING)
             {
                 static::$status = static::STATUS_STOPPING;
-                warning(sprintf("%s 正在停止程序 ......", date('Y-m-d H:i:s')));
+                warning(sprintf("\n%s 正在停止程序 ......", date('Y-m-d H:i:s')));
 
                 while(!$this->dispatchFileSliceToQueue->isEmpty()) {
                     // 持续删除数据，一直到通道数据结构为空

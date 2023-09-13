@@ -37,7 +37,7 @@ class M1905 extends Command
             ->addArgument("save_path", InputArgument::REQUIRED, "视频文件存储路径.")
             // ->addOption('corrents', 'req', InputArgument::OPTIONAL, '并发请求数', 35)
             ->setDescription("dl-m3u8 并发下载M3U8视频")
-            ->setHelp('php dl-m3u8 [/home/m3u8] --req [35]');
+            ->setHelp('php dl-m3u8 /home/m3u8');
     }
 
     protected function initialize(InputInterface $input, OutputInterface $output)
@@ -126,20 +126,20 @@ class M1905 extends Command
         $files = [
            [
                'name' => '变形金刚3',
-               'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
-               'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP',
-                'ext' => 'mp4'
-           ],
+               'video_url' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC/m20140715JYSMUTAG4JLECOZC.m3u8',
+               'cdn' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC',
+               'ext' => 'mp4'
+            ],
             [
                 'name' => '阿凡达2',
-                'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
-                 'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP',
-                 'ext' => 'mp4'
-           ],
-           [
-               'name' => '八角笼中',
-               'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
-               'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP',
+                'video_url' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC/m20140715JYSMUTAG4JLECOZC.m3u8',
+                'cdn' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC',
+                'ext' => 'mp4'
+            ],
+            [
+                'name' => '八角笼中',
+                'video_url' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC/m20140715JYSMUTAG4JLECOZC.m3u8',
+                'cdn' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC',
                 'ext' => 'mp4'
            ]
         ];
@@ -149,7 +149,8 @@ class M1905 extends Command
             $videos[] = new M1905File($file['video_url'], $file['name'], $file['cdn'], $file['ext']);
         }
 
-        $dl = new Downloader(__DIR__ . "/../../videos");
+        // $dl = new Downloader(__DIR__ . "/../../videos");
+        $dl = new Downloader(Downloader::$savePath);
         $dl->download(...$videos);
         $dl->start();
 
