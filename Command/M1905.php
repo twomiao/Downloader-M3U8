@@ -35,7 +35,7 @@ class M1905 extends Command
     {
         $this->setName('m1905')
             ->addArgument("save_path", InputArgument::REQUIRED, "视频文件存储路径.")
-            ->addOption('corrents', 'req', InputArgument::OPTIONAL, '并发请求数', 35)
+            // ->addOption('corrents', 'req', InputArgument::OPTIONAL, '并发请求数', 35)
             ->setDescription("dl-m3u8 并发下载M3U8视频")
             ->setHelp('php dl-m3u8 [/home/m3u8] --req [35]');
     }
@@ -45,7 +45,7 @@ class M1905 extends Command
         Container::register(new DownloaderServiceProvider($output, $input));
         // 如果不填写选项，默认存储位置
         // "/mnt/c/users/twomiao/desktop/downloader/test"
-        Downloader::$savePath = $this->addArgument("save_path");
+        Downloader::$savePath = $input->getArgument("save_path");
     }
 
     protected function drawUiTable(

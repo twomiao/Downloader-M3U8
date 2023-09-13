@@ -34,7 +34,7 @@
 
 ```
   $> cd /Your path/Download-M3u8/
-  $> ./dl-m3u8 m1905 iwfeif wefiwef
+  $> ./dl-m3u8 m1905 /dl-m3u8/download/files
 ```
 
 #### 加密文件实现加密接口，进行解密下载文件：
