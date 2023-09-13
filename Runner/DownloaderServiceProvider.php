@@ -35,7 +35,6 @@ class DownloaderServiceProvider implements ServiceProviderInterface
         $container->extend('event', function ($dispatcher, $container) {
             $dispatcher->addListener(FFmpegConvertVideoFormat::NAME, [new FFmpegConvertVideoFormatListener,"onConvertVideoFormat"]);
             return $dispatcher;
-            // return $storage;
         });
 
         $container[OutputInterface::class] = fn() => $this->out;

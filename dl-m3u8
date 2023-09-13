@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 
@@ -12,7 +13,7 @@ Swoole\Coroutine\run(function() {
     Coroutine::set(['hook_flags' => SWOOLE_HOOK_ALL | SWOOLE_HOOK_CURL]);
     $application = new Application();
     $application->setAutoExit(false);
-    $application->add(new M1906());
+    // $application->add(new M1906());
     $application->add(new M1905());
     $application->run();
 });

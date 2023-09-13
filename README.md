@@ -1,16 +1,16 @@
-##### Downloader M3U8：
+##### dl-m3u8：
 <img src="https://img-blog.csdnimg.cn/d4bb29b0301341cc9739500f62b6fb60.png"  height="250" width="980"/>
 <br/>
 
-#### Downloader M3U8 简介：
+#### dl-m3u8 简介：
 > m3u8准确来说是一种索引文件，使用m3u8文件实际上是通过它来解析对应的放在服务器上的视频网络地址，从而实现在线播放。主要还是复用，类似于一个下载框架；用户自己定义命令，一个命令对应一个下载网站；协程配合Channel进行通信，性能很好。
 
-#### 为何实现 Downloader M3U8？
+#### 为何实现 dl-m3u8？
 1. 因为M3U8格式特殊性，普通一个500MB的视频文件可能切分出上千个视频片段。
 2. 这种视频文件，通过迅雷是无法现在下载全部ts文件自动合并。
 3. 如果使用脚本文件下载合并，网站不同规则不同导致管理及其混乱。
 
-#### Downloader M3U8 优点: 
+#### dl-m3u8 优点: 
    * 自定义下载规则也可方便后续复用。
    * 协程并发下载，能节省许多时间。
    * Ctrl+c安全停止下载程序，避免强制停止丢失数据。
@@ -30,57 +30,11 @@
   git clone https://github.com/twomiao/Downloader-M3U8.git
   composer install (依赖PSR4)
 ```
-
-Downloader M3U8目录结构：
-```
-|-- Downloader-M3U8
-    |-- Runner   Downloader-M3U8 核心实现 
-    |-- Command  添加自定义启动命令 
-    |-- Files    文件解析规则
-        |-- M1905.php -> www.1905.com
-        |-- ..... 更多脚本文件
-        |-- ..... 更多脚本文件
-    |-- vendor composer autoload 
-    |-- Downloader.php 注册启动命令
-```
-
- 启动 Downloader M3U8：
+ 启动 dl-m3u8：
 
 ```
-  $> cd 工作目录
-  $> php8 dl-m3u8 m1906 xxx xxxx 
-```
-
-#### 生成下载模板, 运行命令 php Downloader.php file-tpl downloader-m3u8.json：
-
-```
-{
-  "name": "Downloader-M3u8",
-  "version": "3.0",
-  "files": [
-    {
-      "filename": "花与棋",
-      "m3u8_url": "https://m3u8i.vodfile.m1905.com/202205160334/ad0f002d1da17bf8a582c246b3ef29eb/movie/2018/10/25/m201810250GDNYALQQX19HR1P/145502A2CA0ADBA349064BD2E.m3u8",
-      "url_prefix": "https://m3u8i.vodfile.m1905.com/202205160334/ad0f002d1da17bf8a582c246b3ef29eb/movie/2018/10/25/m201810250GDNYALQQX19HR1P",
-      "put_path": "/mnt/c/users/twomiao/desktop/Downloader",
-      "suffix": "mkv"
-    },
-    {
-      "filename": "把妈妈嫁出去",
-      "m3u8_url": "https://m3u8i.vodfile.m1905.com/202205160333/0579c3c3d34210270eb46594f08f4f39/movie/2017/10/11/m20171011INJ4QIAI1GJIZ18D/2C50A79A9292E6D423E015FFE.m3u8",
-      "url_prefix": "https://m3u8i.vodfile.m1905.com/202205160333/0579c3c3d34210270eb46594f08f4f39/movie/2017/10/11/m20171011INJ4QIAI1GJIZ18D",
-      "put_path": "/mnt/c/users/twomiao/desktop/Downloader",
-      "suffix": "mp4"
-    },
-    {
-      "filename": "举起手来",
-      "m3u8_url": "https://m3u8i.vodfile.m1905.com/202205160332/dd304687cf6546cf4baadc1725690777/movie/2014/07/10/m20140710LP24JW3CN8IB86H6/m20140710LP24JW3CN8IB86H6.m3u8",
-      "url_prefix": "https://m3u8i.vodfile.m1905.com/202205160332/dd304687cf6546cf4baadc1725690777/movie/2014/07/10/m20140710LP24JW3CN8IB86H6",
-      "put_path": "/mnt/c/users/twomiao/desktop/Downloader",
-      "suffix": "mkv"
-    }
-  ]
-}
+  $> cd /Your path/Download-M3u8/
+  $> ./dl-m3u8 m1905 iwfeif wefiwef
 ```
 
 #### 加密文件实现加密接口，进行解密下载文件：
@@ -119,7 +73,7 @@ final class M1905File extends FileM3u8 implements EncryptedFileInterface
 }
 ```
 
-#### php Downloader.php m1905：
+#### php dl-m3u8 m1905：
 ```
 <?php declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';

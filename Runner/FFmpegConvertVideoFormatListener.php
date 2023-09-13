@@ -16,6 +16,11 @@ class FFmpegConvertVideoFormatListener
 {
     public function onConvertVideoFormat(Event $event)
     {
+        $ffmpegPath = Container::make("config")->ffmpeg_bin_path;
+        if(!is_file($ffmpegPath))
+        {
+            return;
+        }
         match($class = get_class($event)) {
             FFmpegConvertVideoFormat::class => $this->workers($event->downloadedFiles()),
             default => throw new \Exception("Unknown event {$class}.")

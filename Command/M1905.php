@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Downloader\Command;
 
 use Downloader\Files\M1905File;
@@ -32,18 +34,18 @@ class M1905 extends Command
     protected function configure()
     {
         $this->setName('m1905')
-            ->addArgument("save", InputArgument::REQUIRED, "下载完成视频文件保存磁盘路径")
-            ->addArgument("load-file", InputArgument::REQUIRED, "下载网站驱动类")
-            ->addOption('concurrent-requests', 'req', InputArgument::OPTIONAL, '并发请求数', 20)
-            ->addOption('suffix-name', 'suffix', InputArgument::OPTIONAL, '视频文件后缀名', "mp4")
+            ->addArgument("save_path", InputArgument::REQUIRED, "视频文件存储路径.")
+            ->addOption('corrents', 'req', InputArgument::OPTIONAL, '并发请求数', 35)
             ->setDescription("dl-m3u8 并发下载M3U8视频")
-            ->setHelp('php dl-m3u8 save [/home/m3u8] --req [20] --suffix [mp4]');
+            ->setHelp('php dl-m3u8 [/home/m3u8] --req [35]');
     }
 
     protected function initialize(InputInterface $input, OutputInterface $output)
     {
         Container::register(new DownloaderServiceProvider($output, $input));
-        Downloader::$savePath = "/mnt/c/users/twomiao/desktop/downloader/test";
+        // 如果不填写选项，默认存储位置
+        // "/mnt/c/users/twomiao/desktop/downloader/test"
+        Downloader::$savePath = $this->addArgument("save_path");
     }
 
     protected function drawUiTable(
@@ -84,63 +86,62 @@ class M1905 extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        /*  $data = [];
-         while(1)
-         {
-             $option = select(
-                 label: '请按以下选项运行程序?',
-                 options: [
-                     self::OPTION_ADD => '添加下载任务',
-                     self::OPTION_DELETE => '删除下载任务',
-                     self::OPTION_RUN => '运行程序',
-                     self::OPTION_QUIT => '退出程序'
-                 ],
-                 default: self::OPTION_ADD,
-             );
-             switch($option) {
-                 case self::OPTION_ADD:
-                     $name  = $this->textFilename("请填写文件名称：");
-                     $url   = $this->textDownloadUrl("请填写下载地址：");
-                     array_push($data, [ 'name' => $name, 'm3u8_url' => $url]);
-                     $key  = \key($data);
-                     array_unshift($data[$key], $key);
-                     \next($data);
-                     break;
-                 case self::OPTION_DELETE:
-                     $id = $this->textFilename("请输入要删除的ID：");
-                     unset($data[(int)$id]);
-                     break;
-                 case self::OPTION_RUN:
-                     goto RUN;
-                 case self::OPTION_QUIT:
-                     return static::SUCCESS;
-             }
-
-            if (\count($data)>0) {
-                 $this->drawUiTable($output, 'www.baidu.com', ['ID', '文件名', '下载地址'], $data);
+        $data = [];
+        while(1) {
+            $option = select(
+                label: '请按以下选项运行程序?',
+                options: [
+                    self::OPTION_ADD => '添加下载任务',
+                    self::OPTION_DELETE => '删除下载任务',
+                    self::OPTION_RUN => '运行程序',
+                    self::OPTION_QUIT => '退出程序'
+                ],
+                default: self::OPTION_ADD,
+            );
+            switch($option) {
+                case self::OPTION_ADD:
+                    $name  = $this->textFilename("请填写文件名称：");
+                    $url   = $this->textDownloadUrl("请填写下载地址：");
+                    array_push($data, [ 'name' => $name, 'm3u8_url' => $url]);
+                    $key  = \key($data);
+                    array_unshift($data[$key], $key);
+                    \next($data);
+                    break;
+                case self::OPTION_DELETE:
+                    $id = $this->textFilename("请输入要删除的ID：");
+                    unset($data[(int)$id]);
+                    break;
+                case self::OPTION_RUN:
+                    goto RUN;
+                case self::OPTION_QUIT:
+                    return static::SUCCESS;
             }
-         }
-         RUN: */
+
+            if (\count($data) > 0) {
+                $this->drawUiTable($output, 'www.baidu.com', ['ID', '文件名', '下载地址'], $data);
+            }
+        }
+        RUN:
 
         $files = [
+           [
+               'name' => '变形金刚3',
+               'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
+               'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP',
+                'ext' => 'mp4'
+           ],
             [
-                'name' => '变形金刚3',
+                'name' => '阿凡达2',
                 'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
-                'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP', 
+                 'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP',
                  'ext' => 'mp4'
-            ],
-             [
-                 'name' => '阿凡达2',
-                 'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
-                  'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP', 
-                  'ext' => 'mp4'
-            ],
-            [
-                'name' => '八角笼中',
-                'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
-                'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP', 
-                 'ext' => 'mp4'
-            ]
+           ],
+           [
+               'name' => '八角笼中',
+               'video_url' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP/AEC06BAE912E0862B4F7B1B22.m3u8',
+               'cdn' => 'https://m3u8i.vodfile.m1905.com/202309122237/78cadc30724606747f22859630c88730/movie/2015/11/30/m20151130ACC8WYILBOGQG8IP',
+                'ext' => 'mp4'
+           ]
         ];
 
         $videos = [];
