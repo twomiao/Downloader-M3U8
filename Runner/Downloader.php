@@ -1,17 +1,25 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Downloader\Runner;
 
-use Pimple\Container;
+use Dariuszp\CliProgressBar;
+use Exception;
+use RuntimeException;
+use SplObjectStorage;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\WaitGroup;
-use Swoole\Process;
-use Swoole\Timer;
 use Symfony\Component\Console\Helper\Table;
-use Symfony\Component\Console\Input\InputInterface;
+use Swoole\Coroutine\Barrier;
+use Swoole\Timer;
+use Swoole\Coroutine\System;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\EventDispatcher\EventDispatcher;
+
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
 
 /**
  * @version 3.0
@@ -27,562 +35,498 @@ class Downloader
     public const PROGRAM_NAME = 'Downloader-M3u8';
 
     // 正在运行
-    protected const STATE_RUNNING = 2;
+    protected const STATUS_RUNNING = 2;
 
     // 正在启动
-    protected const STATE_STARTING = 1;
-
-    // 退出
-    protected const STATE_QUIT = 3;
+    protected const STATUS_STARTING = 1;
+    
+    // 正在停止
+    protected const STATUS_STOPPING = 3;
+    
+    // 停止完成
+    protected const STATUS_STOPPED = 4;
 
     /**
      * 当前运行状态
-     * @var int $stateCurrent
+     * @property int $stateCurrent
      */
-    protected static int $stateCurrent = self::STATE_STARTING;
+    protected static int $status = self::STATUS_STARTING;
 
     /**
-     * @var Container $container
+     * 等待下载文件对象
+     * @property array $waitingToDownloadFiles
      */
-    protected static Container $container;
-
-    /**
-     * 文件队列
-     * @var array $files
-     */
-    protected array $files = [];
+    protected static ?\SplObjectStorage $waitingToDownloadFiles = null;
 
     /**
      * 启动时间
-     * @var int $start
+     * @property int $start
      */
-    protected int $startUp;
+    protected static int $startup;
 
     /**
-     * @var bool $flag
+     * @property ConfigFile $configFile
      */
-    protected bool $flag = false;
+    protected static ConfigFile $configFile;
 
     /**
-     * 超时时间
-     * @var int $timeout
+     * 文件保存路径
+     * @property string $savePath
      */
-    protected int $timeout = 240;
+    public static string $savePath;
 
     /**
-     * 命令行输出
-     * @var Terminal $cmd
+     *
+     * @property $dispatchFileSliceToQueue \Swoole\Coroutine\Channel
      */
-    protected Terminal $terminal;
-
-    /*-----------------------------------------
-     | 协程池
-     | ----------------------------------------
-     | 并发数量       $workerCount
-     | 队列大小       $queueLength
-     | 任务队列       $queueMaxSizeChannel
-     | 挂起全部协程    $waitGroup
-     | 退出消费者协程  $hasQuit
-     -----------------------------------------*/
-    public int $queueLength    = 90;
-    protected int $workerCount = 8;
-    protected Channel $queueChannel;
-    protected WaitGroup $waitGroup;
-    protected Channel $quitProgram;
-    protected Channel $writeFile;
-    protected bool $hasQuit = false;
+    protected Channel $dispatchFileSliceToQueue;
 
     /**
-     * Downloader constructor.
-     * @param Container $container
-     * @param InputInterface $input
-     * @param OutputInterface $output
+     * 视频存放路径
+     * @property string $savePath
      */
-    public function __construct(Container $container, InputInterface $input, OutputInterface $output)
+    public function __construct(string $savePath)
     {
-        // 协程数量
-        $this->workerCount = $this->getWorkerCount();
-        // 退出程序
-        $this->quitProgram = new Channel(1);
-        // 阻塞进程
-        $this->waitGroup = new WaitGroup();
-
-        $this->writeFile = new Channel();
-
-        // 命令行输出
-        $this->terminal = new Terminal($input, $output, 'INFO');
-        $this->terminal->message();
-        $this->startUp = time();  // 启动时间
-
-        static::$container = $container;
+        // 启动时间
+        static::$startup = time();
+        static::$configFile = Container::make("config");
+        static::$savePath = $savePath;
+        static::$waitingToDownloadFiles = new \SplObjectStorage();
+        $this->dispatchFileSliceToQueue = new Channel(static::$configFile->count);
     }
 
-    /**
-     * 超时时间设置
-     * @param int $timeout
-     */
-    public function setTimeout(int $timeout) : void {
-        if (static::$stateCurrent === self::STATE_RUNNING) {
-            return;
-        }
-        // 超时时间超过1小时，
-        if ($timeout < -1 && $timeout > 3600) {
-            $timeout = 120;
-        }
-        $this->timeout = $timeout;
-    }
-
-    /**
-     * 最大并发请求数量
-     * @param int $requests
-     */
-    public function setConcurrentRequestsNumber(int $requests = 8) : void
+    public function download(FileM3u8 ...$fileM3u8): void
     {
-        if (static::$stateCurrent === self::STATE_RUNNING) {
-            return;
-        }
-
-        if ($requests < 1 || $requests > 10000) {
-            $requests = 8;
-        }
-        $this->workerCount = $requests;
-    }
-
-    protected function getWorkerCount() : int
-    {
-        return $this->workerCount;
-    }
-
-    /**
-     * 最大并发数量限制
-     * @param int setQueueValue
-     */
-    public function setQueueLength(int $length = 0) : void
-    {
-        if (static::$stateCurrent === self::STATE_RUNNING) {
-            return;
-        }
-
-        if ($length === 0 || $length < 1 ||
-            $length <= $this->workerCount) {
-            $length = $this->workerCount * 2;
-        }
-
-        $this->queueLength = $length;
-    }
-
-    protected function getQueueLength() : int
-    {
-        return $this->queueLength;
-    }
-
-    public function addFile(FileM3u8 $file) : void
-    {
-        $this->files[] = $file;
-    }
-
-    protected function installSignal()
-    {
-        Process::signal(SIGINT, function(){
-            if ($this->flag === false) {
-                $this->flag = true;
-                // 触发定时器轮询安全退出进程
-                $this->quitProgram->push(true);
-                var_dump('SIGINT');
-            }
-        });
-    }
-
-    /**
-     * @param FileM3u8 $file
-     * @return void
-     * @throws \Exception
-     */
-    protected function downloadFileM3u8(FileM3u8 $file) : void
-    {
-        // 分片文件集合
-        $files  = $file->transportStreamArray();
-        // 视频播放时长
-        $file->setTransportStreamFile($files);
-        $second = $file->getPlaySecond();
-        $file->setPlayTime($second);
-        $file->setState(FileM3u8::STATE_CONTENT_SUCCESS);
-        // 初始化进度条
-        $file->cliProgressBar->setDetails("下载中[ {$file->getFilename()} ]: ");
-        $file->cliProgressBar->setBarLength(100);
-        $file->cliProgressBar->setSteps(\count($file));
-    }
-
-    protected function hasFiles() :bool {
-        return !empty($this->files());
-    }
-
-    public function files() : array
-    {
-        return $this->files;
-    }
-
-    /**
-     * @return int
-     */
-    protected function fileFinCount() : int {
-        $counter = 0;
-        if (!$this->hasFiles())
-        {
-            return $counter;
-        }
+        $barrier = Barrier::make();
+        $coroutineNum = 0;
         /**
-         * @var FileM3u8 $file
+         * @var $file FileM3u8
          */
-        foreach ($this->files() as $file) {
-            if (!$file instanceof FileM3u8) {
+        foreach($fileM3u8 as $file) {
+            // 文件对象全部保存进下载程序
+            static::waitingToDownloadFiles()->attach($file, $file);
+            // 本地已经下载过，跳过下载
+            if ($file->isFile()) {
+                $file->taskFinished->flag  = TaskFinished::FLAG_LOCAL_FILE_EXISTS;
                 continue;
             }
-            if($file->getState() === FileM3u8::STATE_CONTENT_SUCCESS) {
-                $counter++;
-            }
-        }
-        return $counter;
-    }
-
-    protected function fileFailCount() :int {
-        $counter = 0;
-        if (!$this->hasFiles())
-        {
-            return $counter;
-        }
-        /**
-         * @var FileM3u8 $file
-         */
-        foreach ($this->files() as $file) {
-            if (!$file instanceof FileM3u8) {
-                continue;
-            }
-            if($file->getState() === FileM3u8::STATE_FAIL) {
-                $counter++;
-            }
-        }
-        return $counter;
-    }
-
-    /**
-     * @throws \Exception
-     */
-    protected function downloadStart() : void
-    {
-        if (!$this->hasFiles()) {
-            throw new \Exception('未发现下载任务');
-        }
-        // 运行中
-        static::$stateCurrent = self::STATE_RUNNING;
-        foreach ( $this->files() as $id => $file) {
-            if (!$file instanceof FileM3u8) {
-                continue;
-            }
-            $this->waitGroup->add();
-            Coroutine::create(function() use($file,$id) {
-                Coroutine::defer(function() {
-                    $this->waitGroup->done();
-                });
+            // 开启一个协程下载文件信息
+            Coroutine::create(function () use ($barrier, $file, &$coroutineNum) {
+                !is_dir($file->savePath) && mkdir($file->savePath, 0777, true);
                 try {
-                    // 下载一个文件
-                    $this->downloadFileM3u8($file);
-                    $this->terminal->print(sprintf("[%d] 搜索网络文件完成: 《%s》", $id, $file->getFilename()));
-                } catch (\Exception | \Error $e) {
-                    // 标记失败任务
-                    $file->setState(FileM3u8::STATE_FAIL);
-                    // 记录错误文件日志
-                    static::$container['logger']
-                        ->error(
-                            __METHOD__.":异常日志:{$file->getUrl()} -> {$e->getMessage()},错误代码: {$e->getCode()}."
-                        );
-                    $file->cliProgressBar->setColorToRed();
-                    // 获取资源失败 101: 请求失败  102: 文件内容无效
-                    if ($e->getCode() === 101 || $e->getCode() === 102) {
-                        $file->setMessage($e->getMessage());
-                    }
+                    /**
+                     * 下载文件信息
+                     * @var $file Downloader\Runner\FileM3u8;
+                     */
+                    $file = $this->downloadM3u8FileInfo($file);
+                    $file->taskFinished->total = $file->count();
+                } catch(\Exception $e) {
+                    $file->taskFinished->flag = TaskFinished::FLAG_DOWNLOAD_FILEINFO_ERROR;
+                    // 记录日志
+                    Container::make("log")->error((string)$e);
+                } finally {
+                    $coroutineNum++;
                 }
             });
         }
-        // 超时?
-        if (!$this->waitGroup->wait($this->timeout)) {
-            throw new \Exception('下载任务存在部分超时!');
+        Barrier::wait($barrier);
+    }
+
+    protected function downloadM3u8FileInfo(FileM3u8 $file): FileM3u8
+    {
+        $client = new Client($file->m3u8Url);
+        /**
+         * @var $reponse Response
+         */
+        $respnose = $client->send("get");
+        if (($statusCode = $respnose->getStatusCode()) === 200) {
+            $data = $respnose->getBody();
+            $pathList = FileM3u8::getPathList($data);
+            if (0 === \count($pathList)) {
+                throw new RuntimeException("Invalid download file { {$file->m3u8Url} }.");
+            }
+            // $file->taskFinished->total = \count($pathList);
+            $savePath = $file->savePath.DIRECTORY_SEPARATOR;
+            // 得到一个列表
+            $file->addFlieSlices(
+                // 批量转换对象
+                ...array_map(
+                    static fn (
+                        string $path
+                    ) => (
+                        new FileSlice($path, $savePath)),
+                    $pathList
+                )
+            );
+            return $file;
+        }
+        throw new RuntimeException("Abnormal server response status code {$statusCode}.");
+    }
+
+    protected function isRunningDownloader()
+    {
+        if (static::$status === static::STATUS_RUNNING) {
+            throw new RuntimeException("Task is running.");
         }
     }
 
     public function start()
     {
-        try
+        // 是否已经启动
+        $this->isRunningDownloader();
+        // 分发文件到Channel 进行下载
+        $this->dispatchFileToQueue();
+        // 监控队列开始下载分片
+        $this->downloadFileSliceFromQueue();
+        // 显示任务进度
+        $this->taskDownloadCompleted();
+        // 视频文件保存到本地
+        $this->saveFileToHardDisk();
+        // 转换文件格式
+        $this->diskFileConvertFormat();
+        // 汇报下载完成信息
+        $this->displayDownloadInfo();
+    }
+
+    /**
+     * 无返回值
+     * 显示下载结果
+     * 文件名称 文件大小 文件保存路径 文件分片总数量
+     */
+    protected function displayDownloadInfo(): void
+    {
+        if(static::runStatus() !== static::STATUS_RUNNING)
         {
-            if (self::STATE_RUNNING === self::$stateCurrent) {
-                throw new \RuntimeException('已经存在运行实例');
-            }
-            // 查找网络文件
-            $this->downloadStart();
-        } catch (\Exception $e) {
-            $this->terminal->print($e->getMessage());
             return;
-        } finally {
-            $this->terminal->print(
-                sprintf("搜索网络文件结束，成功:[%d]个,失败:[%d]个",
-                    $this->fileFinCount(),
-                    $this->fileFailCount()
-                )
+        } 
+        static::$status = static::STATUS_STOPPED;
+        $out = Container::make(OutputInterface::class);
+        $table = new Table($out);
+        $table->setHeaderTitle("www.1905.com");
+        $table->setVertical(true);
+        $table
+            ->setHeaders(['序号', '文件名称', '文件类型', '文件大小', '下载保存路径', '需下载分片', '已下载分片','错误分片', '下载状态'])
+            ->setRows($this->downloadFileInfo());
+        $table->setStyle("box");
+        $table->render();
+        posix_kill(getmypid(), SIGINT);
+    }
+
+    protected function downloadFileInfo(): array
+    {
+        $res = [];
+        foreach (static::waitingToDownloadFiles() as $k => $file) {
+            $fileSize = $file->getSizeformat();
+            $filename = $file->getBasename();
+            // $status = $file->taskFinished->flag;
+            $downloadPath   = $file->getFilename();
+            $fileSliceCount = $file->count();
+            $mimeType  = $file->getMimeType();
+            $res[] = array(
+                $k++,
+                "<info>『{$filename}』</info>",
+                $mimeType,
+                $fileSize,
+                $downloadPath,
+                $fileSliceCount,
+                $file->taskFinished->succeedNum,
+                $file->taskFinished->errors,
+                $file->taskFinished->errors === 0 ? "<info>『成功』</info>":"<error>『失败』</error>"
             );
         }
-
-        // 安装信号处理器
-        $this->installSignal();
-        // 投递文件到协程通道
-        $this->dropOffDocuments();
-        // 管控进程
-        $this->monitorWorkerPool();
-        // 协程挂起
-        $this->waitGroup->wait();
-        // 创建本地视频文件
-        $this->createFileVideo();
-        // 统计下载结
-        $this->downloadResults();
-        // 输出下载时间
-        $this->timeCost();
+        return $res;
     }
 
-    protected function monitorWorkerPool() {
-        Coroutine::create(function() {
-           $this->quitProgram->pop();
-           $id = Timer::tick(1000, function()use(&$id) {
-               if ($this->queueChannel->length() > 0) {
-                   return;
-               }
-               Timer::clear($id);
-               $this->queueChannel->close();
-               $this->quitProgram->close();
-               $this->hasQuit = true;
-           });
-        });
-    }
-
-    protected function dropOffDocuments()
+    /**
+     * 无返回值
+     * 使用多进程加速视频格式转换
+     */
+    protected function diskFileConvertFormat(): void
     {
-        // 队列任务
-        $this->queueChannel = new Channel($this->getQueueLength());
-
-        /**
-         * @var FileM3u8 $m3u8File
-         */
-        foreach ($this->files() as $m3u8File)
+        // 终止进程运行
+        if (static::runStatus() === static::STATUS_STOPPING) {
+            static::$status = static::STATUS_STOPPED;
+        }
+        if (static::runStatus() === static::STATUS_STOPPED)
         {
-            // 失败不进行下载
-            if ($m3u8File->getState() === FileM3u8::STATE_FAIL) {
-                continue;
-            }
-
-            if ($m3u8File->exists()) {
-                $m3u8File->cliProgressBar->addCurrentStep($m3u8File->count());
-                $m3u8File->setState(FileM3u8::STATE_SUCCESS);
-                continue;
-            }
-            $this->waitGroup->add();
-            Coroutine::create(function()use($m3u8File) {
-                Coroutine::defer( fn()=> $this->waitGroup->done() );
-                /**
-                 * @var TransportStreamFile $tsFile
-                 */
-                foreach ($m3u8File as $tsFile) {
-                    // 停止运行
-                    if($this->flag) {
-                        return;
-                    }
-
-                    if ($tsFile->exists()) {
-                        $tsFile->setState(TransportStreamFile::STATE_SUCCESS);
-                        $m3u8File->cliProgressBar->addCurrentStep(1);
-                        $m3u8File->setFileSize($tsFile->getFileSize());
-                        continue;
-                    }
-                    $this->queueChannel->push($tsFile);
-                }
-            });
-
-            // 下载文件队列任务
-            $this->makeWorkerPool();
-        }
-
-        // 文件数据为空，自动触发安全退出
-        $this->waitGroup->add();
-        Coroutine::create(function() {
-            Coroutine::defer(fn() => $this->waitGroup->done());
-            while(!$this->queueChannel->isEmpty()) {
-                Coroutine::sleep(1);
-            }
-
-            if (!$this->flag) {
-                $this->quitProgram->push(true);
-            }
-        });
-    }
-
-    protected function makeWorkerPool()
-    {
-        for ($i = 1; $i <= $this->workerCount; $i++)
-        {
-            $this->waitGroup->add();
-            Coroutine::create(function() {
-                Coroutine::defer(function(){
-                   $this->waitGroup->done();
-                });
-
-                while(true) {
-                    /**
-                     * @var $tsFile TransportStreamFile
-                     */
-                    $tsFile = $this->queueChannel->pop();
-                    if (!$tsFile) {
-                        return;
-                    }
-                    $this->downloadTsFragment($tsFile, 6, 15);
-                }
-            });
-        }
-    }
-
-    protected function downloadTsFragment(TransportStreamFile $transportStreamFile, int $retry, int $timeout) : bool
-    {
-        $e = null;
-
-        while($retry-- > 0) {
-            try
-            {
-                if ($data = $transportStreamFile->getBody($timeout)) {
-                    $transportStreamFile->setState(TransportStreamFile::STATE_SUCCESS);
-                        // ts 视频文件大小
-                        $fileSize = $transportStreamFile->saveFile($data);
-                        $fileM3u8 = $transportStreamFile->getFileM3u8();
-                        $fileM3u8->setFileSize($fileSize);
-                        $fileM3u8->cliProgressBar->addCurrentStep(1);
-                        // 100%进度条改变为绿色
-                        if ($fileM3u8->cliProgressBar->getSteps() === $fileM3u8->cliProgressBar->getCurrentStep()) {
-                            $fileM3u8->cliProgressBar->setColorToGreen();
-                            $fileM3u8->cliProgressBar->setDetails("下载完成[ {$fileM3u8->getFilename()} ]: ");
-                            $fileM3u8->cliProgressBar->display();
-                            $fileM3u8->cliProgressBar->end();
-                        } else {
-                            // 不断显示任务进度条
-                            $fileM3u8->cliProgressBar->display();
-                            // 多任务下载可开启，命令行进度条显示才能正常
-                            $fileM3u8->cliProgressBar->nl();
-                        }
-                        return true;
-                    }
-                $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
-            } catch (\Exception | \Error $e) {
-                // 下载失败,记录日志
-                $transportStreamFile->setState(TransportStreamFile::STATE_FAIL);
-                if ($retry === 0)
-                {
-                    static::$container['logger']
-                        ->error(__METHOD__."-> {$transportStreamFile->getUrl()} 程序异常: {$e}");
-                }
-            } finally {
-                // 网络请求失败,记录下载失败
-                $transportStreamFile->getFileM3u8()
-                    ->setState(
-                is_null($e) ? FileM3u8::STATE_SUCCESS : FileM3u8::STATE_FAIL
-                    );
-            }
-        }
-        return false;
-    }
-
-    protected function createFileVideo() {
-        $waitGroup = null;
-
-        if($this->flag) {
+            posix_kill(getmypid(), SIGINT);
             return;
         }
-
-        /**
-         * @var $file FileM3u8
-         */
-        foreach ($this->files() as $id => $file) {
-            // 失败不进行合并
-            if ($file->getState() === FileM3u8::STATE_FAIL) {
-                continue;
-            }
-            // 文件存在不创建协程生成视频文件
-            if ($file->exists()) {
-                $file->setState(FileM3u8::STATE_SUCCESS);
-                continue;
-            }
-            if ($file->cliProgressBar->getSteps() !== $file->cliProgressBar->getCurrentStep()) {
-                $file->setState(FileM3u8::STATE_FAIL);
-                 continue;
-            }
-            //  文件下载完成,开始合并
-            if (is_null($waitGroup)) {
-                $waitGroup = new WaitGroup();
-            }
-
-            $waitGroup->add();
-            Coroutine::create(function() use($file,$waitGroup) {
-                Coroutine::defer(fn()=>$waitGroup->done());
-                try
-                {
-                    /**
-                     * @var $dispatcher EventDispatcher
-                     */
-                    $dispatcher = self::$container['dispatcher'];
-                    // 事件为空，添加默认处理器[二进制]
-                    if (!$dispatcher->hasListeners(CreateVideoFileEvent::NAME)) {
-                        $dispatcher->addListener(CreateVideoFileEvent::NAME,
-                            [
-                                new CreateBinaryVideoListener(), CreateBinaryVideoListener::METHOD_NAME
-                            ]
-                        );
-                    }
-                    // 视频转换合并
-                    $dispatcher->dispatch(new CreateVideoFileEvent($file), CreateVideoFileEvent::NAME);
-                } catch (\Exception | \Error $e) {
-                    // 写入日志文件
-                    static::$container['logger']->error(__METHOD__.":异常日志:{$e->getMessage()}, 错误代码: {$e->getCode()}.");
-                }
-            });
-        }
-        if (!is_null($waitGroup)) {
-            $waitGroup->wait();
-        }
+    
+        Container::make("event")->dispatch(new FFmpegConvertVideoFormat(static::waitingToDownloadFiles()), FFmpegConvertVideoFormat::NAME);
     }
 
-    protected function downloadResults() {
-        $output = $this->terminal->getOutput();
-        if (is_null($output)) {
-            return;
+    protected function newMutliProgressBar(array $files): ?MultipleProgressBar
+    {
+        $max = 0;
+        foreach ($files as $file) {
+            $len = mb_strwidth($file->getBasename(".mp4"));
+            if ($max < $len) {
+                $max = $len;
+            }
         }
-        // 下载结果
+
+        $multipleProgressBar = new MultipleProgressBar($files);
+
+        foreach($files as $file) {
+            // 每个文件对应一条进度条
+            $basename = $file->getBasename(".mp4");
+            $basename = str_repeat(" ", $max - mb_strwidth($basename))."『{$basename}』";
+            //『』︽︾「」;
+            $progressBar = new CliProgressBar($file->count());
+            $progressBar->setDetails("{$basename}» ");
+            $progressBar->setColorToCyan();
+            $multipleProgressBar->addProgressBar($file, $progressBar);
+        }
+        $multipleProgressBar->display();
+        return $multipleProgressBar;
+    }
+
+    protected static function downloadedSuccessfullyFiles(SplObjectStorage $files): array
+    {
         $result = [];
+        foreach($files as $file) {
+            if ($file->taskFinished->flag === TaskFinished::FLAG_DOWNLOAD_SUCCEED) {
+                $result[] = $file;
+            }
+        }
+        return $result;
+    }
+
+    protected static function runStatus() : int
+    {
+        return static::$status;
+    }
+
+    protected function saveFileToHardDisk(): void
+    {
+        if (static::runStatus() !== static::STATUS_RUNNING)
+        {
+            return;
+        }
+        // 下载失败
+        $files = $this->downloadedSuccessfullyFiles(static::waitingToDownloadFiles());
+        if(\count($files) === 0) {
+            return;
+        }
+        warning(sprintf("%s 开始生成视频文件......", date('Y-m-d H:i:s')));
+        // 创建多进度条
+        $multiProgressBar = $this->newMutliProgressBar($files);
+
+        $wg = new WaitGroup();
+        $wg->add();
+        $tid = \Swoole\Timer::tick(50, function () use ($wg, $multiProgressBar, &$tid) {
+            $num = $multiProgressBar->drawCliMultiProgressBar();
+            if ($num  === $multiProgressBar->count()) {
+                Timer::clear($tid);
+                info(sprintf("\n%s 保存「{$num}」个文件成功.", date('Y-m-d H:i:s')));
+                $wg->done();
+            }
+        });
+
         /**
          * @var $file FileM3u8
          */
-        foreach ($this->files() as $id => $file) {
-            $info['id']           = ++$id;
-            $info['filename']     = $file->getFilename();
-            $info['count']        = \count($file);
-            $info['local']        = $file->cliProgressBar->getCurrentStep();
-            $info['now']          = $file->getPlaySecondFormat();
-//            $info['save_path']    = \realpath($file->getRealFilename());
-            $info['filesize']     = $file->getFileSizeFormat();
-            $info['status']       = $file->getStateText();
-            $result[] = $info;
+        foreach (static::waitingToDownloadFiles() as $file) {
+            // 只允许下载完成的文件，并且本地不存在才进行文件合并操作
+            if ($file->taskFinished->flag !== TaskFinished::FLAG_DOWNLOAD_SUCCEED) {
+                continue;
+            }
+            // 由于有磁盘IO，咱们还是开启协程
+            // 开启一个协程读写文件
+            $wg->add();
+            Coroutine::create(function () use ($wg, $file, &$count) {
+                Coroutine::defer(fn () =>  $wg->done());
+                try {
+                    foreach($file->fileSlice as $fileSlice) {
+                        $fileSize = $this->fileSliceAppendToFile($fileSlice);
+                        if ($fileSize > 0) {
+                            $file->taskFinished->succeedNum++;
+                        } else {
+                            $file->taskFinished->errors++;
+                        }
+                    }
+                    $file->taskFinished->flag = TaskFinished::FLAG_SAVE_FILE_SUCCEED;
+                } catch(\Exception $e) {
+                    $file->taskFinished->errors++;
+                    $file->taskFinished->flag = TaskFinished::FLAG_SAVE_FILE_ERROR;
+                    // 记录日志文件，这里直接忽略, 因为合并很少会出现失败
+                    Container::make("log")->error((string)$e);
+                } finally {
+                    $count++;
+                }
+            });
         }
-        $fileTable = new Table($output);
-        $fileTable->setHeaders(['ID', '视频名','任务数量', '本地数量', '播放时长', '文件大小', '下载状态']);
-        $fileTable->setRows($result);
-        $fileTable->render();
+        $wg->wait();
     }
 
-    protected function timeCost() {
+    /**
+     * 返回每个文件分片字节大小
+     */
+    protected function fileSliceAppendToFile(FileSlice $fileSlice): int
+    {
+        $filename = $fileSlice->belongsToFile()->tmpFilename();
+        $data = System::readFile($fileSlice->filename());
+        return (int)\Swoole\Coroutine\System::writeFile($filename, $data, FILE_APPEND);
+    }
+
+    protected function taskDownloadCompleted()
+    {
+        $taskCompleted = new \Swoole\Coroutine\Channel();
+                     // 创建多进度条
+        $files = static::downloadedSuccessfullyFiles(static::waitingToDownloadFiles());
+        $multiProgressBar = $this->newMutliProgressBar($files);
+        $tid = Timer::tick(500, function () use (&$tid, $taskCompleted,  $multiProgressBar) {
+            // 多进度条显示
+            match(static::$status)
+            {
+                static::STATUS_RUNNING => $multiProgressBar->drawCliMultiProgressBar(),
+                default => ""
+            };
+
+            $dispatchQueueStats = $this->dispatchFileSliceToQueue->stats();
+            // var_dump($dispatchQueueStats);
+            // 消费者数量与配置文件一致,生产者数量全部退出，队列容量为空
+            // 说明程序下载完成
+            if ($dispatchQueueStats['consumer_num'] === static::$configFile->count &&
+            $dispatchQueueStats['producer_num'] === 0 &&
+            $dispatchQueueStats['queue_num'] === 0) {
+                match(static::$status)
+                {
+                    static::STATUS_RUNNING => $multiProgressBar->drawCliMultiProgressBar(),
+                    default => ""
+                };
+                $this->dispatchFileSliceToQueue->close();
+                \Swoole\Timer::clear($tid);
+                info(sprintf("%s 下载视频文件结束!", date('Y-m-d H:i:s')));
+                $taskCompleted->push(true);
+            }
+        });
+        // 任务下载是否已经完成
+        $taskCompleted->pop();
+        // var_dump("Download succeed!");
+        // 重置当前文件下载状态
+        static::resetTaskFinished();
+    }
+
+    protected static function resetTaskFinished(): void
+    {
+        foreach (static::waitingToDownloadFiles() as $file) {
+            $file->resetTaskFinished();
+        }
+    }
+
+    protected function downloadFileSliceFromQueue(): void
+    {
+        $count = static::$configFile->count;
+        while($count -- > 0) {
+            \Swoole\Coroutine::create(function () {
+                while($fileSlice = $this->dispatchFileSliceToQueue->pop()) {
+                    // 确认是下载的文件分片
+                    if($fileSlice instanceof FileSlice) {
+                        // 文件
+                        $file = $fileSlice->belongsToFile();
+                        $url = $file->downloadCdnUrl($fileSlice);
+                        try {
+                            $client = new Client($url);
+                            // 下载文件分片的字节大小
+                            // $fileSize = $client->downloadFile($fileSlice);
+                            $client->downloadFile($fileSlice);
+                            $fileSliceStatus = FileSlice::STATE_SUCCESS;
+                            // 下载成功数累计
+                            $file->taskFinished->succeedNum++;
+                        } catch(\Exception $e) {
+                            $fileSliceStatus = FileSlice::STATE_FAIL;
+                            $file->taskFinished->flag = TaskFinished::FLAG_DOWNLOAD_ERROR;
+                            // 错误数累计
+                            $file->taskFinished->errors++;
+                            // 写入日志
+                            // error($e->getMessage());
+                            Container::make("log")->error((string)$e);
+                        }
+                        // 标记文件分片下载状态
+                        $fileSlice->setDownloadStatus($fileSliceStatus);
+                    }
+                }
+            });
+        }
+    }
+
+    protected function dispatchFileToQueue(): void
+    {
+        // 运行中
+        static::$status = static::STATUS_RUNNING;
+        // 注册信号
+        foreach (static::waitingToDownloadFiles() as $file) {
+            if ($file->taskFinished->flag === TaskFinished::FLAG_DOWNLOAD_FILEINFO_SUCCEED) {
+                // 开启多个生产者协程开始下载
+                \Swoole\Coroutine::create([$this, 'dispatchTaskToQueue'], $file);
+            }
+        }
+        // stop
+        \Swoole\Coroutine::create(fn() => $this->terminatedProcess());
+    }
+
+    protected function terminatedProcess() {
+    //    \Swoole\Coroutine::defer(fn() => var_dump("退出程序..."));
+       while(\Swoole\Coroutine\System::waitSignal(SIGINT))
+       {
+            if (static::runStatus() === static::STATUS_RUNNING)
+            {
+                static::$status = static::STATUS_STOPPING;
+                warning(sprintf("%s 正在停止程序 ......", date('Y-m-d H:i:s')));
+
+                while(!$this->dispatchFileSliceToQueue->isEmpty()) {
+                    // 持续删除数据，一直到通道数据结构为空
+                    // 此刻只需要等待定时器关闭通道唤醒协程,这时候返回false
+                    $this->dispatchFileSliceToQueue->pop();
+                }
+            } elseif (static::runStatus() === static::STATUS_STOPPED) {
+                info(sprintf("%s 停止运行成功!", date('Y-m-d H:i:s')));
+                break;
+            }
+        }
+    }
+
+    protected function dispatchTaskToQueue(FileM3u8 $file): void
+    {
+        if (is_null($file->fileSlice) ||
+            !$file->fileSlice instanceof \SplObjectStorage) {
+            return;
+        }
+        // 标记下载完成，后续流程分片失败，文件重新标记失败
+        // 投递前标记成功
+        $file->taskFinished->flag = TaskFinished::FLAG_DOWNLOAD_SUCCEED;
+        $file->fileSlice->rewind();
+        while($file->fileSlice->valid()) {
+            if (static::runStatus() !== static::STATUS_RUNNING)
+            {
+                $file->taskFinished->flag = TaskFinished::FLAG_DOWNLOAD_ERROR;
+                return;
+            }
+            // 分发文件分片到下载协程
+            $fileSlice = $file->fileSlice->current();
+            // 文件分片已经存在本地
+            if (!$fileSlice->isFile()) {
+                $this->dispatchFileSliceToQueue->push($fileSlice);
+            } else {
+                $file->taskFinished->succeedNum++;
+                $fileSlice->setDownloadStatus(FileSlice::STATE_SUCCESS);
+            }
+
+            $file->fileSlice->next();
+        }
+    }
+
+    protected static function waitingToDownloadFiles(): \SplObjectStorage
+    {
+        return static::$waitingToDownloadFiles;
+    }
+
+    protected function downloadTime() : string
+    {
         // 分钟数
-        $timeCost = time() - $this->startUp;
+        $timeCost = time() - static::$startup;
         $unit     = '秒';
         if ($timeCost >= 60) {
             $unit     = '分钟';
@@ -594,7 +538,7 @@ class Downloader
             $unit     = '小时';
         }
         $timeCost   = \sprintf("%0.2f", $timeCost);
-        $fileNumber = \count($this->files());
-        print date('Y-m-d H:i:s'). " >下载用时{$timeCost}{$unit}, 完成({$fileNumber})个任务.\n";
+     
+        return $timeCost . "{$unit}";
     }
 }

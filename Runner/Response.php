@@ -6,24 +6,31 @@ namespace Downloader\Runner;
 final class Response
 {
     private string $body;
-    private array $header;
+    private array $headers;
+    private int $statusCode;
 
-    public function __construct(array $header, string $body)
+    public function __construct(int $statusCode, array $headers, string $body)
     {
-        $this->header = $header;
+        $this->statusCode = $statusCode;
+        $this->headers = $headers;
         $this->body = $body;
     }
-    public function getHeader($key = null)
+
+    public function getStatusCode() : int {
+        return $this->statusCode;
+    }
+
+    public function getHeader($key = null) : string
     {
-        return $this->header[$key] ?? '';
+        return $this->headers[$key] ?? '';
     }
 
     public function getHeaders() :array
     {
-        return $this->header;
+        return $this->headers;
     }
 
-    public function getBody():string {
+    public function getBody() : string {
         return $this->body;
     }
 }
