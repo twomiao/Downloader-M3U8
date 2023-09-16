@@ -99,7 +99,6 @@ class Downloader
     {
         echo PHP_EOL;
         $tid = Prompt::loading("加载用时「%d」秒 %s");
-        sleep(5);
         $barrier = Barrier::make();
         $coroutineNum = 0;
         /**
@@ -135,8 +134,7 @@ class Downloader
         Barrier::wait($barrier);
         // 文件信息加载完毕
         Prompt::stop($tid);
-        echo PHP_EOL;
-        echo PHP_EOL;
+        echo str_repeat(PHP_EOL,2);
     }
 
     protected function downloadM3u8FileInfo(FileM3u8 $file): FileM3u8
@@ -238,8 +236,7 @@ class Downloader
                 $fileSliceCount,
                 $file->taskFinished->succeedNum,
                 $file->taskFinished->errors,
-                $file->taskFinished->flag === TaskFinished::FLAG_SAVE_FILE_SUCCEED ?
-                 "<info>『成功』</info>":"<error>『失败』</error>"
+                $file->succeed() ? "<info>『成功』</info>":"<error>『失败』</error>"
             );
         }
         return $res;

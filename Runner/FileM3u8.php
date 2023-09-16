@@ -98,6 +98,15 @@ abstract class FileM3u8  extends SplFileInfo implements \Countable
         }
     }
 
+    public function succeed() {
+        return match($this->taskFinished->flag)
+        {
+            TaskFinished::FLAG_SAVE_FILE_SUCCEED,
+            TaskFinished::FLAG_LOCAL_FILE_EXISTS => true,
+            default => false
+        };
+    }
+
     abstract public function downloadCdnUrl(FileSlice $fileSlice) : string;
 
     /**
