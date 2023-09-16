@@ -18,7 +18,7 @@ final class ConfigFile {
             '-y',
             '%to'
         ],
-        "count" => 35, // 协程数量
+        "count" => 40, // 协程数量
         "http_set" => [
             'retry_num' => 3, // 失败重试3次
             'connect_timeout' => 15,//连接超时，会覆盖第一个总的 timeout

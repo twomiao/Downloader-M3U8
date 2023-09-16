@@ -92,13 +92,10 @@ abstract class FileM3u8  extends SplFileInfo implements \Countable
            unlink($tmpFile);
         }
 
-        // foreach ($this->fileSlice as $file)
-        // {
-        //     if ($file instanceof FileSlice)
-        //     {
-        //         $file->delete();
-        //     }
-        // }
+        foreach ($this->fileSlice as $fileSlice)
+        {
+            $fileSlice instanceof FileSlice && $fileSlice->delete();
+        }
     }
 
     abstract public function downloadCdnUrl(FileSlice $fileSlice) : string;

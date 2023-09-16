@@ -97,6 +97,9 @@ class Downloader
 
     public function download(FileM3u8 ...$fileM3u8): void
     {
+        echo PHP_EOL;
+        $tid = Prompt::loading("加载用时「%d」秒 %s");
+        sleep(5);
         $barrier = Barrier::make();
         $coroutineNum = 0;
         /**
@@ -130,6 +133,10 @@ class Downloader
             });
         }
         Barrier::wait($barrier);
+        // 文件信息加载完毕
+        Prompt::stop($tid);
+        echo PHP_EOL;
+        echo PHP_EOL;
     }
 
     protected function downloadM3u8FileInfo(FileM3u8 $file): FileM3u8
