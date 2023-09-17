@@ -67,7 +67,6 @@ class FileSlice extends SplFileInfo
         clearstatcache();
         if (is_file($this->filename()))
         {
-            $this->belongsToFile = null;
             return @unlink($this->filename);
         }
         return true;
@@ -81,25 +80,8 @@ class FileSlice extends SplFileInfo
         return $this->filename;
     }
 
-    // /**
-    //  * @param string|null $data
-    //  * @param bool $overwrite
-    //  * @return int
-    //  * @throws \Exception
-    //  */
-    // public function saveFile(string $data, bool $overwrite = false) :int
-    // {
-    //     if($this->exists() && !$overwrite) {
-    //        return \filesize($this->filePath);
-    //     }
-
-    //     if ($this->fileM3u8->isEncryptFile()) {
-    //         $data = $this->fileM3u8->decryptFile()->decrypt($data, $this);
-    //     }
-
-    //     if (System::writeFile($this->filePath, $data) === false) {
-    //         throw new \RuntimeException('文件保存失败:'.$this->filePath);
-    //     }
-    //     return \filesize($this->filePath);
-    // }
+    public function __destruct()
+    {
+        $this->belongsToFile = null;
+    }
 }

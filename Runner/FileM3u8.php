@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Downloader\Runner;
 
 use Downloader\Runner\Contracts\EncryptedFileInterface;
+use RuntimeException;
 use SplFileInfo;
 use SplObjectStorage;
 
@@ -186,6 +187,10 @@ abstract class FileM3u8  extends SplFileInfo implements \Countable
     
     public function count(): int
     {
+        if (is_null($this->fileSlice))
+        {
+            throw new RuntimeException("File shard is empty.");
+        }
         return $this->fileSlice->count();
     }
 
