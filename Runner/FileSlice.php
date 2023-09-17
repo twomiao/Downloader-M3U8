@@ -29,9 +29,9 @@ class FileSlice extends SplFileInfo
 
     /**
      * 属于哪个文件
-     * @property $belongsToFile FileM3u8
+     * @property $belongsToFile FileM3u8 
      */
-    protected FileM3u8 $belongsToFile;
+    protected ?FileM3u8 $belongsToFile;
 
     public function __construct(
         protected string $path,
@@ -67,7 +67,8 @@ class FileSlice extends SplFileInfo
         clearstatcache();
         if (is_file($this->filename()))
         {
-            return unlink($this->filename());
+            $this->belongsToFile = null;
+            return @unlink($this->filename);
         }
         return true;
     }

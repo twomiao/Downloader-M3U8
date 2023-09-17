@@ -96,6 +96,10 @@ abstract class FileM3u8  extends SplFileInfo implements \Countable
         {
             $fileSlice instanceof FileSlice && $fileSlice->delete();
         }
+        $this->fileSlice = null;
+        if (is_dir($this->savePath)) {
+            @rmdir($this->savePath);
+        }
     }
 
     public function succeed() {

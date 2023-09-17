@@ -223,9 +223,7 @@ class Downloader
         foreach (static::waitingToDownloadFiles() as $k => $file) {
             $fileSize = $file->getSizeformat();
             $filename = $file->getBasename();
-            // $status = $file->taskFinished->flag;
             $downloadPath   = $file->getFilename();
-            $fileSliceCount = $file->count();
             $mimeType  = $file->getMimeType();
             $res[] = array(
                 $k++,
@@ -233,7 +231,7 @@ class Downloader
                 $mimeType,
                 $fileSize,
                 $downloadPath,
-                $fileSliceCount,
+                $file->taskFinished->total,
                 $file->taskFinished->succeedNum,
                 $file->taskFinished->errors,
                 $file->succeed() ? "<info>『成功』</info>":"<error>『失败』</error>"
