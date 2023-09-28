@@ -45,12 +45,12 @@ class Client
         // info($this->url . ' ' . $code);
         $data = $respnose->getBody();
         // 如果加密解密
-        if($fileSlice->belongsToFile()->isEncrypted())
+        if($fileSlice->file->isEncrypted())
         {
-            $data = $fileSlice->belongsToFile()->decrypt($data);
+            $data = $fileSlice->file->decrypt($data);
         }
         
-        return (int)file_put_contents($fileSlice->filename(), $data);
+        return $fileSlice->save($data);
     }
 
     protected function getServerPort() : int {

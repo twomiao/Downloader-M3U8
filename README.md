@@ -87,6 +87,9 @@ use Swoole\Coroutine;
 
 ini_set('memory_limit', '4048M');
 
+// 开启守护进程运行
+Process::daemon(true, false);
+
 Swoole\Coroutine\run(function() {
     Coroutine::set(['hook_flags' => SWOOLE_HOOK_ALL | SWOOLE_HOOK_CURL]);
     $application = new Application();

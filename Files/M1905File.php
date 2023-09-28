@@ -12,12 +12,6 @@ use Downloader\Runner\FileSlice;
  */
 final class M1905File extends FileM3u8 implements EncryptedFileInterface
 {
-    /**
-     * 下载域名
-     * @var string $downloadDomainName
-     */
-    public static string $downloadDomainName = "www.1905.com";
-
     public function decrypt(string $data): string
     {
         // return openssl_decrypt($fileData, 'aes-128-cbc', '6a1177f9ceedcdcf', OPENSSL_RAW_DATA);
@@ -25,7 +19,7 @@ final class M1905File extends FileM3u8 implements EncryptedFileInterface
         return $data;
     }
     
-    public function downloadCdnUrl(FileSlice $fileSlice) : string 
+    public function fileSliceUrl(FileSlice $fileSlice) : string 
     {
         return "{$this->cdnUrl}/".$fileSlice->getPath();
     }

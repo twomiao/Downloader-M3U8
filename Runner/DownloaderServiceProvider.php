@@ -10,11 +10,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 
 class DownloaderServiceProvider implements ServiceProviderInterface
 {
-
-    public function __construct(public OutputInterface $out)
-    {
-        
-    }
+    public function __construct(public OutputInterface $out) {}
     /**
      * Registers services on the given container.
      *
@@ -26,19 +22,20 @@ class DownloaderServiceProvider implements ServiceProviderInterface
     public function register(Container $container)
     {
         // 日志服务
-        $container['log'] = fn() => new Logger(getcwd() . '/logs');
-        // 事件服务
-        $container['event'] = fn() => new EventDispatcher();
+        $container['log'] = fn () => new Logger(getcwd() . '/logs');
         // 配置文件
-        $container['config'] = fn() => new ConfigFile();
+        $container['config'] = fn () => new ConfigFile();
 
+        // 视频保存路径
+        $container['video_save_path'] = "/mnt/c/users/twomiao/desktop/downloader/videos";
+
+        // 事件服务
+        $container['event'] = fn () => new EventDispatcher();
         $container->extend('event', function ($dispatcher, $container) {
-            $dispatcher->addListener(FFmpegConvertVideoFormat::NAME, [new FFmpegConvertVideoFormatListener,"onConvertVideoFormat"]);
+            $dispatcher->addListener(SaveFile::NAME, [new SaveFileListener(),"onSaveFile"]);
             return $dispatcher;
         });
 
-        $container[OutputInterface::class] = fn() => $this->out;
-        // $container[InputInterface::class] = fn() => $this->in;
-
+        $container[OutputInterface::class] = fn () => $this->out;
     }
 }

@@ -1,12 +1,13 @@
-<?php  
+<?php
+
 declare(strict_types=1);
+
 namespace Downloader\Runner;
 
 use Dariuszp\CliProgressBar;
-use SplObjectStorage;
-use Swoole\Timer;
+use Swoole\Coroutine\Channel;
 
-class MultipleProgressBar  
+class MultipleProgressBar
 {
     /**
      *  ['task1' => progressBar, 'task2' => progressBar, .....]
@@ -20,68 +21,77 @@ class MultipleProgressBar
      */
     protected int $movePointer = 0;
 
+    protected ?Channel $saveFileChan = null;
+
     /**
      * 任务数据
      * @property array<string, FileM3u8> $files
      */
-    public function __construct(protected array $files = [])
+    public function __construct(protected array $files = []) {}
+
+    public function addProgressBar(FileM3u8 $file, CliProgressBar $progressBar): void
     {
-        
-    }
-
-    public function addProgressBar(FileM3u8 $file, CliProgressBar $progressBar) : void {
         $this->movePointer++;
-        $this->progressBarMap[spl_object_hash($file)] = $progressBar;
+        $this->progressBarMap[$file->id()] = $progressBar;
     }
 
-    public function count() : int {
-        return \count( $this->progressBarMap );
+    public function count(): int
+    {
+        return \count($this->progressBarMap);
     }
 
-    public function display() : static {
+    public function initDisplay(): static
+    {
         // 初始化显示进度条
-        foreach($this->progressBarMap as $key => $progressBar)
-        {
+        foreach($this->progressBarMap as $progressBar) {
             $progressBar->display();
             $progressBar->end();
         }
         return $this;
     }
 
-    public function movePointer() : void {
-        print ("\33[{$this->movePointer}A");
+    public function saveFileChan(Channel $saveFile)
+    {
+        $this->saveFileChan = $saveFile;
     }
 
-    public function drawCliMultiProgressBar() : int {
-        print ("\33[{$this->movePointer}A");
-        $succeed = 0;
-        foreach ($this->files as $file)
-        {
+
+    public function movePointer(): void
+    {
+        print("\33[{$this->movePointer}A");
+    }
+
+    public function display(): void
+    {
+        $this->movePointer();
+        foreach ($this->files as $file) {
             if ($this->drawCliProgressBar($file)) {
-                $succeed++;
+                if($file->statistics()->flag === Statistics::DOWNLOAD_OK) {
+                    continue;
+                }
+                $file->statistics()->flag = Statistics::DOWNLOAD_OK;
+                if (!is_null($this->saveFileChan)) {
+                    $this->saveFileChan->push($file);
+                }
             }
         }
-        return $succeed;
     }
 
-    public function drawCliProgressBar(FileM3u8 $file) : bool {
-        $progressBar =  $this->progressBarMap[spl_object_hash($file)];
-        $progressBar->setCurrentStep($file->taskFinished->succeedNum);
+    public function drawCliProgressBar(FileM3u8 $file): bool
+    {
+        $progressBar =  $this->progressBarMap[$file->id()];
+        $progressBar->setCurrentStep($file->statistics()->succeedNum);
         $flag = false;
-        if ($file->taskFinished->errors > 0)
-        {
-            // 下载失败(30) [变形金刚5]:
+        if ($file->statistics()->errors > 0) {
             $progressBar->setColorToRed();
         }
 
-        if ($progressBar->getCurrentStep() == $progressBar->getSteps())
-        {
-            // 下载完成 [变形金刚5]: 
+        if ($progressBar->getCurrentStep() == $progressBar->getSteps()) {
             $progressBar->setColorToGreen();
             $flag = true;
         }
         $progressBar->display();
         $progressBar->end();
-        return $flag; 
+        return $flag;
     }
 }

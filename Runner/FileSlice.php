@@ -1,87 +1,46 @@
 <?php
 namespace Downloader\Runner;
 
-use RuntimeException;
-use SplFileInfo;
 use Swoole\Coroutine\System;
+use SplFileInfo;
 
 class FileSlice extends SplFileInfo
 {
-    /**
-     * @property int
-     */
-    const STATE_SUCCESS = 1;
-
-    /**
-     * @property int
-     */
-    const STATE_FAIL = 2;
-
     /**
      * @property string $filename
      */
     protected string $filename;
 
-    /**
-     * @property int $downloadStatus
-     */
-    public int $downloadStatus;
-
-    /**
-     * 属于哪个文件
-     * @property $belongsToFile FileM3u8 
-     */
-    protected ?FileM3u8 $belongsToFile;
 
     public function __construct(
         protected string $path,
-        protected string $savePath)
-    {
-        $this->filename = $this->savePath.\rtrim(pathinfo($path, PATHINFO_BASENAME),".ts").".ts";
+        public FileM3u8 $file
+    ) {
+        $this->filename = $file->subDirectory . DIRECTORY_SEPARATOR. \rtrim(pathinfo($path, PATHINFO_BASENAME), ".ts") . ".ts";
         parent::__construct($this->filename);
     }
 
-    public function file(FileM3u8 $file) : void
-    {
-        $this->belongsToFile = $file;
-    }
-
-    public function belongsToFile() : FileM3u8 {
-        if(is_null($this->belongsToFile))
-        {
-            throw new RuntimeException("File ownership is empty.");
-        }
-        return $this->belongsToFile;
-    }
-
-    public function setDownloadStatus(int $downloadStatus) : void {
-        $this->downloadStatus = $downloadStatus;
-    }
-
-    public function downloadSuccess() : bool {
-       return $this->downloadStatus === static::STATE_SUCCESS;
-    }
-
-    public function delete() : bool
+    public function delete(): bool
     {
         clearstatcache();
-        if (is_file($this->filename()))
-        {
+        if (is_file($this->filename())) {
             return @unlink($this->filename);
         }
         return true;
     }
 
-    public function getPath() : string {
+    public function save(string $data) : int
+    {
+        return (int)System::writeFile($this->filename(), $data, FILE_APPEND);
+    }
+
+    public function getPath(): string
+    {
         return $this->path;
     }
 
-    public function filename() : string {
-        return $this->filename;
-    }
-
-    public function __destruct()
+    public function filename(): string
     {
-        $this->belongsToFile = null;
+        return $this->filename;
     }
 }

@@ -34,7 +34,7 @@ class M1905 extends Command
     protected function configure()
     {
         $this->setName('m1905')
-            ->addArgument("save_path", InputArgument::REQUIRED, "视频文件存储路径.")
+            // ->addArgument("save_path", InputArgument::REQUIRED, "视频文件存储路径.")
             // ->addOption('corrents', 'req', InputArgument::OPTIONAL, '并发请求数', 35)
             ->setDescription("dl-m3u8 并发下载M3U8视频")
             ->setHelp('php dl-m3u8 /home/m3u8');
@@ -43,9 +43,6 @@ class M1905 extends Command
     protected function initialize(InputInterface $input, OutputInterface $output)
     {
         Container::register(new DownloaderServiceProvider($output, $input));
-        // 如果不填写选项，默认存储位置
-        // "/mnt/c/users/twomiao/desktop/downloader/test"
-        Downloader::$savePath = $input->getArgument("save_path");
     }
 
     protected function drawUiTable(
@@ -86,71 +83,52 @@ class M1905 extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $data = [];
-        while(1) {
-            $option = select(
-                label: '请按以下选项运行程序?',
-                options: [
-                    self::OPTION_ADD => '添加下载任务',
-                    self::OPTION_DELETE => '删除下载任务',
-                    self::OPTION_RUN => '运行程序',
-                    self::OPTION_QUIT => '退出程序'
-                ],
-                default: self::OPTION_ADD,
-            );
-            switch($option) {
-                case self::OPTION_ADD:
-                    $name  = $this->textFilename("请填写文件名称：");
-                    $url   = $this->textDownloadUrl("请填写下载地址：");
-                    array_push($data, [ 'name' => $name, 'm3u8_url' => $url]);
-                    $key  = \key($data);
-                    array_unshift($data[$key], $key);
-                    \next($data);
-                    break;
-                case self::OPTION_DELETE:
-                    $id = $this->textFilename("请输入要删除的ID：");
-                    unset($data[(int)$id]);
-                    break;
-                case self::OPTION_RUN:
-                    goto RUN;
-                case self::OPTION_QUIT:
-                    return static::SUCCESS;
-            }
+        // $data = [];
+        // while(1) {
+        //     $option = select(
+        //         label: '请按以下选项运行程序?',
+        //         options: [
+        //             self::OPTION_ADD => '添加下载任务',
+        //             self::OPTION_DELETE => '删除下载任务',
+        //             self::OPTION_RUN => '运行程序',
+        //             self::OPTION_QUIT => '退出程序'
+        //         ],
+        //         default: self::OPTION_ADD,
+        //     );
+        //     switch($option) {
+        //         case self::OPTION_ADD:
+        //             $name  = $this->textFilename("请填写文件名称：");
+        //             $url   = $this->textDownloadUrl("请填写下载地址：");
+        //             array_push($data, [ 'name' => $name, 'm3u8_url' => $url]);
+        //             $key  = \key($data);
+        //             array_unshift($data[$key], $key);
+        //             \next($data);
+        //             break;
+        //         case self::OPTION_DELETE:
+        //             $id = $this->textFilename("请输入要删除的ID：");
+        //             unset($data[(int)$id]);
+        //             break;
+        //         case self::OPTION_RUN:
+        //             goto RUN;
+        //         case self::OPTION_QUIT:
+        //             return static::SUCCESS;
+        //     }
 
-            if (\count($data) > 0) {
-                $this->drawUiTable($output, 'www.baidu.com', ['ID', '文件名', '下载地址'], $data);
-            }
-        }
-        RUN:
+        //     if (\count($data) > 0) {
+        //         $this->drawUiTable($output, 'www.baidu.com', ['ID', '文件名', '下载地址'], $data);
+        //     }
+        // }
+        // RUN:
 
         $files = [
-           [
-               'name' => '变形金刚3',
-               'video_url' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC/m20140715JYSMUTAG4JLECOZC.m3u8',
-               'cdn' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC',
-               'ext' => 'mp4'
-            ],
-            [
-                'name' => '阿凡达2',
-                'video_url' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC/m20140715JYSMUTAG4JLECOZC.m3u8',
-                'cdn' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC',
-                'ext' => 'mp4'
-            ],
-            [
-                'name' => '八角笼中',
-                'video_url' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC/m20140715JYSMUTAG4JLECOZC.m3u8',
-                'cdn' => 'https://m3u8i.vodfile.m1905.com/202309142201/06b75191bc54729b5a9c618808638743/movie/2014/07/15/m20140715JYSMUTAG4JLECOZC',
-                'ext' => 'mp4'
-           ]
         ];
 
         $videos = [];
         foreach ($files as $file) {
-            $videos[] = new M1905File($file['video_url'], $file['name'], $file['cdn'], $file['ext']);
+            $videos[] = new M1905File($file['video_url'], $file['name'], $file['cdn']);
         }
 
-        // $dl = new Downloader(__DIR__ . "/../../videos");
-        $dl = new Downloader(Downloader::$savePath);
+        $dl = new Downloader("www.baidu.com");
         $dl->download(...$videos);
         $dl->start();
 
