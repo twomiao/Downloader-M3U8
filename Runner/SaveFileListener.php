@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 namespace Downloader\Runner;
 
 use Exception;
@@ -8,14 +9,11 @@ use Symfony\Contracts\EventDispatcher\Event;
 use Swoole\Coroutine;
 use Symfony\Component\Process\Process;
 
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\warning;
-
 class SaveFileListener
 {
     public function onSaveFile(Event $event)
     {
-        Coroutine::defer(static fn () => Downloader::$fileCount--);
+        Coroutine::defer(static fn () => static::clearTempFile($event->file));
         try {
             if($event instanceof SaveFile && $event->file->save()) {
                 // 进行格式转换
@@ -24,6 +22,12 @@ class SaveFileListener
         } catch(Exception $e) {
             Container::make("log")->error((string)$e);
         }
+    }
+
+    protected static function clearTempFile(FileM3u8 $file): void
+    {
+        $file->deleteTempFile();
+        Downloader::$fileCount--;
     }
 
     protected static function ffmpegConvertVideoFormat(FileM3u8 $file): void
@@ -52,8 +56,6 @@ class SaveFileListener
             }
         } catch(Exception $e) {
             Container::make("log")->error((string)$e);
-        } finally {
-            $file->deleteTempFile();
         }
     }
 }

@@ -120,8 +120,6 @@ class Downloader
         }
         $end->wait();
         // 文件信息加载完毕
-        echo PHP_EOL;   
-        echo PHP_EOL;   
         Prompt::stop($id);
     }
 
