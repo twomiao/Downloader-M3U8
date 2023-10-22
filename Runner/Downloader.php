@@ -98,7 +98,7 @@ class Downloader
 
     public function download(FileM3u8 ...$fileM3u8): void
     {
-        echo PHP_EOL;  
+        echo PHP_EOL;
         $id = Prompt::loading("加载用时「%d」秒 %s");
         $end = new WaitGroup();
         foreach($fileM3u8 as $file) {
@@ -116,7 +116,7 @@ class Downloader
             }
             // 开始下载文件信息
             $end->add();
-            Coroutine::create(static fn () => static::downloadM3u8FileInfo($file, $end));
+            Coroutine::create(static fn() => static::downloadM3u8FileInfo($file, $end));
         }
         $end->wait();
         // 文件信息加载完毕
@@ -130,7 +130,7 @@ class Downloader
 
     protected static function downloadM3u8FileInfo(FileM3u8 $file, WaitGroup $end)
     {
-        Coroutine::defer(static fn () => $end->done());
+        Coroutine::defer(static fn() => $end->done());
         try {
             $client = new Client($file->m3u8Url);
             /**
@@ -147,7 +147,7 @@ class Downloader
                 $file->addFlieSlices(
                     // 批量转换对象
                     ...array_map(
-                        static fn (
+                        static fn(
                             string $path
                         ) => (
                             new FileSlice($path, $file)),
@@ -202,7 +202,7 @@ class Downloader
 
     protected static function makeMutliProgressBar(FileM3u8 ...$files): ?MultipleProgressBar
     {
-        $maxWidth  = max(array_map(static fn ($file) => mb_strwidth($file->getBasename(".mp4")), $files));
+        $maxWidth  = max(array_map(static fn($file) => mb_strwidth($file->getBasename(".mp4")), $files));
 
         $multipleProgressBar = new MultipleProgressBar($files);
         $multipleProgressBar->saveFileChan(static::$saveFileChan);
@@ -225,7 +225,7 @@ class Downloader
         Coroutine::create(function () {
             while($file = static::$saveFileChan->pop()) {
                 Coroutine::create(
-                    static fn () => Container::make("event")->dispatch(new SaveFile($file), SaveFile::NAME)
+                    static fn() => Container::make("event")->dispatch(new SaveFile($file), SaveFile::NAME)
                 );
             }
         });
@@ -235,7 +235,7 @@ class Downloader
     {
         $dlQuit = new Channel();
         // 查找正在下载的文件
-        $files = array_filter(static::$files, static fn ($file, $k) => $file->downloding(), 1);
+        $files = array_filter(static::$files, static fn($file, $k) => $file->downloding(), 1);
         $progressBar = $this->makeMutliProgressBar(... $files);
         $tid = Timer::tick(250, function () use (&$tid, $dlQuit, $progressBar) {
             // 多进度条显示
@@ -263,12 +263,11 @@ class Downloader
         });
         // 任务下载是否已经完成
         $dlQuit->pop();
-        info("用时({$this->downloadTime()})运行结束!");
-        if (static::$status === static::STATUS_RUNNING) {
-            static::$status = static::STATUS_NORMALEXIT;
-        } elseif (static::$status === static::STATUS_STOPPING) {
-            static::$status = static::STATUS_STOPPED;
-        }
+        info("运行 {$this->downloadTime()} 结束!");
+        static::$status = match(static::$status) {
+            static::STATUS_RUNNING => static::STATUS_NORMALEXIT,
+            static::STATUS_STOPPING => static::STATUS_STOPPED
+        };
         SwProcess::kill(getmypid(), SIGINT);
     }
 
@@ -316,11 +315,11 @@ class Downloader
         foreach (static::$files as $file) {
             if ($file->statistics->flag === Statistics::WAITING) {
                 // 开启多个生产者协程开始下载
-                Coroutine::create(static fn () => static::dispatchTaskToQueue($file));
+                Coroutine::create(static fn() => static::dispatchTaskToQueue($file));
             }
         }
         // stop
-        Coroutine::create(static fn () => static::cancelDownload());
+        Coroutine::create(static fn() => static::cancelDownload());
     }
 
     protected static function cancelDownload()

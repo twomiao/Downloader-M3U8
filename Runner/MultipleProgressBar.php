@@ -70,9 +70,7 @@ class MultipleProgressBar
                     continue;
                 }
                 $file->statistics()->flag = Statistics::DOWNLOAD_OK;
-                if (!is_null($this->saveFileChan)) {
-                    $this->saveFileChan->push($file);
-                }
+                $this->saveFileChan?->push($file);
             }
         }
     }
@@ -81,17 +79,17 @@ class MultipleProgressBar
     {
         $progressBar =  $this->progressBarMap[$file->id()];
         $progressBar->setCurrentStep($file->statistics()->succeedNum);
-        $flag = false;
+        $res = false;
         if ($file->statistics()->errors > 0) {
             $progressBar->setColorToRed();
         }
 
         if ($progressBar->getCurrentStep() == $progressBar->getSteps()) {
             $progressBar->setColorToGreen();
-            $flag = true;
+            $res = true;
         }
         $progressBar->display();
         $progressBar->end();
-        return $flag;
+        return $res;
     }
 }
