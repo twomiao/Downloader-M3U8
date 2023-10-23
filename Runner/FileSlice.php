@@ -16,13 +16,13 @@ class FileSlice extends SplFileInfo
 
     public function delete(): bool
     {
-        clearstatcache();
         $filename = $this->filename();
+        clearstatcache(true, $filename);
+        $this->file = null;
         if (is_file($filename)) {
             return @unlink($filename);
         }
-        $this->file = null;
-        return true;
+        return false;
     }
 
     public function save(string $data): int
